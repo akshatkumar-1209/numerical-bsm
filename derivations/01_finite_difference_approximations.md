@@ -1,105 +1,196 @@
-# Derivation 1: Finite-Difference Approximations from Taylor Expansions
+# Part 1 — Finite-Difference Approximations and the Computational Grid
 
-**Author:** Akshat Kumar  
-**Supervisor:** Dr. Ashok Kumar Vaikuntam  
-**Reference:** Daniel J. Duffy, *Numerical Methods in Computational Finance* (Wiley, 2022), Chapters 3–4  
-
----
-
-## 1. Objective
-
-To derive the standard forward, backward, and central difference formulas for first and second derivatives from Taylor-series expansions, and to determine their leading truncation error terms.
+> **Programs:** [`programs/finite_difference_derivatives.py`](../programs/finite_difference_derivatives.py), [`programs/generate_grid.py`](../programs/generate_grid.py)
+> **Output:** [`results/02_finite_differences.txt`](../results/02_finite_differences.txt), [`results/03_grid_payoff_boundaries.txt`](../results/03_grid_payoff_boundaries.txt), [`figures/fig01_fd_truncation_error.png`](../figures/fig01_fd_truncation_error.png)
 
 ---
 
-## 2. Taylor Series Expansions
+## 1.1 The problem
 
-Assume $f: \mathbb{R} \to \mathbb{R}$ is sufficiently smooth ($f \in C^4$). For a small grid spacing $h > 0$, Taylor's theorem states:
+The Black–Scholes equation (Part 2) contains three derivatives of the option value $V(S,\tau)$:
 
-$$f(x + h) = f(x) + h f'(x) + \frac{h^2}{2!} f''(x) + \frac{h^3}{3!} f^{(3)}(x) + \frac{h^4}{4!} f^{(4)}(\xi_1), \quad \xi_1 \in (x, x+h)$$
+$$
+\frac{\partial V}{\partial \tau}, \qquad \frac{\partial V}{\partial S}, \qquad \frac{\partial^2 V}{\partial S^2}.
+$$
 
-$$f(x - h) = f(x) - h f'(x) + \frac{h^2}{2!} f''(x) - \frac{h^3}{3!} f^{(3)}(x) + \frac{h^4}{4!} f^{(4)}(\xi_2), \quad \xi_2 \in (x-h, x)$$
+A computer can only store $V$ at finitely many points. The finite-difference method therefore has to answer one question before anything else:
+
+> *How can a derivative be replaced by an algebraic combination of function values at neighbouring grid points, and how large is the error made by this replacement?*
+
+This part derives the answers from Taylor's theorem and defines the grid used throughout the project.
 
 ---
 
-## 3. First Derivative Approximations
+## 1.2 Notation and assumptions
 
-### 3.1 Forward Difference (First Order)
+| Symbol | Meaning |
+|---|---|
+| $f(x)$ | a function of one variable (later: $V$ as a function of $S$ or of $\tau$) |
+| $h > 0$ | step size (later $h = \Delta S$ in space or $h = \Delta\tau$ in time) |
+| $f', f'', f''', f^{(4)}$ | first to fourth derivatives of $f$ |
+| $O(h^p)$ | a quantity bounded by $C h^p$ for small $h$, with $C$ independent of $h$ |
+| $D_+,\ D_-,\ D_0,\ D_+D_-$ | forward, backward, central and second-difference operators |
 
-Rearranging the expansion of $f(x + h)$:
+**Assumption.** $f$ is smooth near $x$: for the first-order formulas $f \in C^2$, for the central first difference $f \in C^3$, for the second difference $f \in C^4$. (Part 8 discusses what happens at the strike, where this assumption fails for the payoff.)
 
-$$h f'(x) = f(x + h) - f(x) - \frac{h^2}{2} f''(x) - \mathcal{O}(h^3)$$
+---
 
-Dividing by $h$:
+## 1.3 Taylor expansions
 
-$$f'(x) = \frac{f(x + h) - f(x)}{h} - \frac{h}{2} f''(\xi_1)$$
+Taylor's theorem with Lagrange remainder gives, for some $\xi_\pm$ between $x$ and $x \pm h$,
 
-- **Finite difference formula:** $D_+ f(x) = \frac{f(x+h) - f(x)}{h}$
-- **Truncation error:** $\mathcal{O}(h)$ — first-order accurate. Halving $h$ reduces error by a factor of 2.
+$$
+f(x+h) = f(x) + h f'(x) + \frac{h^2}{2} f''(x) + \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_+), \tag{1.1}
+$$
 
-### 3.2 Backward Difference (First Order)
+$$
+f(x-h) = f(x) - h f'(x) + \frac{h^2}{2} f''(x) - \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_-). \tag{1.2}
+$$
 
-Rearranging the expansion of $f(x - h)$:
+Every formula below is obtained by combining (1.1) and (1.2) so that the unwanted derivatives cancel.
 
-$$h f'(x) = f(x) - f(x - h) + \frac{h^2}{2} f''(x) - \mathcal{O}(h^3)$$
+---
 
-Dividing by $h$:
+## 1.4 First derivative
 
-$$f'(x) = \frac{f(x) - f(x - h)}{h} + \frac{h}{2} f''(\xi_2)$$
+**Forward difference.** Truncate (1.1) after the $h^2$ term and solve for $f'(x)$:
 
-- **Finite difference formula:** $D_- f(x) = \frac{f(x) - f(x-h)}{h}$
-- **Truncation error:** $\mathcal{O}(h)$ — first-order accurate.
+$$
+D_+ f(x) \equiv \frac{f(x+h) - f(x)}{h} = f'(x) + \frac{h}{2} f''(\xi_+). \tag{1.3}
+$$
 
-### 3.3 Central Difference (Second Order)
+**Backward difference.** The same with (1.2):
 
-Subtracting the expansion of $f(x - h)$ from $f(x + h)$:
+$$
+D_- f(x) \equiv \frac{f(x) - f(x-h)}{h} = f'(x) - \frac{h}{2} f''(\xi_-). \tag{1.4}
+$$
 
-$$f(x + h) - f(x - h) = 2h f'(x) + 2\frac{h^3}{3!} f^{(3)}(x) + \mathcal{O}(h^5)$$
+Both errors are proportional to $h$: the one-sided formulas are **first-order accurate**, $O(h)$.
+
+**Central difference.** Subtract (1.2) from (1.1). The even-order terms $f(x)$ and $\tfrac{h^2}{2}f''(x)$ cancel:
+
+$$
+f(x+h) - f(x-h) = 2h f'(x) + \frac{h^3}{3} f'''(x) + O(h^5).
+$$
 
 Dividing by $2h$:
 
-$$f'(x) = \frac{f(x + h) - f(x - h)}{2h} - \frac{h^2}{6} f^{(3)}(\xi)$$
+$$
+D_0 f(x) \equiv \frac{f(x+h) - f(x-h)}{2h} = f'(x) + \frac{h^2}{6} f'''(x) + O(h^4). \tag{1.5}
+$$
 
-- **Finite difference formula:** $D_0 f(x) = \frac{f(x+h) - f(x-h)}{2h}$
-- **Truncation error:** $\mathcal{O}(h^2)$ — second-order accurate. Because symmetric even terms cancel, halving $h$ quarters the error.
-
----
-
-## 4. Second Derivative Approximation
-
-Adding the expansions of $f(x + h)$ and $f(x - h)$:
-
-$$f(x + h) + f(x - h) = 2f(x) + h^2 f''(x) + 2\frac{h^4}{4!} f^{(4)}(\xi) + \mathcal{O}(h^6)$$
-
-Rearranging for $f''(x)$:
-
-$$h^2 f''(x) = f(x + h) - 2f(x) + f(x - h) - \frac{h^4}{12} f^{(4)}(\xi)$$
-
-Dividing by $h^2$:
-
-$$f''(x) = \frac{f(x + h) - 2f(x) + f(x - h)}{h^2} - \frac{h^2}{12} f^{(4)}(\xi)$$
-
-- **Finite difference formula:** $D_+ D_- f(x) = \frac{f(x+h) - 2f(x) + f(x-h)}{h^2}$
-- **Truncation error:** $\mathcal{O}(h^2)$ — second-order accurate. Halving $h$ quarters the error.
+The symmetric arrangement removes the $O(h)$ term, so the central difference is **second-order accurate**, $O(h^2)$.
 
 ---
 
-## 5. Application to the Black-Scholes Operator
+## 1.5 Second derivative
 
-In the Black-Scholes PDE, the asset price derivatives at grid node $S_j = j \Delta S$ are approximated by:
+Add (1.1) and (1.2). Now the odd-order terms cancel:
 
-1. **Delta ($\frac{\partial V}{\partial S}$):**
-   $$\left(\frac{\partial V}{\partial S}\right)_j \approx \frac{V_{j+1} - V_{j-1}}{2 \Delta S}, \quad \text{Error } = \mathcal{O}(\Delta S^2)$$
+$$
+f(x+h) + f(x-h) = 2 f(x) + h^2 f''(x) + \frac{h^4}{12} f^{(4)}(\xi), \qquad \xi \in (x-h, x+h).
+$$
 
-2. **Gamma ($\frac{\partial^2 V}{\partial S^2}$):**
-   $$\left(\frac{\partial^2 V}{\partial S^2}\right)_j \approx \frac{V_{j+1} - 2V_j + V_{j-1}}{\Delta S^2}, \quad \text{Error } = \mathcal{O}(\Delta S^2)$$
+Subtracting $2f(x)$ and dividing by $h^2$:
 
-Both central stencils involve only nearest neighbours $(j-1, j, j+1)$, forming a 3-point stencil which produces a tridiagonal linear system.
+$$
+D_+D_- f(x) \equiv \frac{f(x+h) - 2f(x) + f(x-h)}{h^2} = f''(x) + \frac{h^2}{12} f^{(4)}(\xi). \tag{1.6}
+$$
+
+The name $D_+D_-$ is exact: applying the forward difference to the backward difference gives the same three-point formula. The approximation is **second-order accurate**.
 
 ---
 
-## 6. Numerical Verification
+## 1.6 Time derivative
 
-Implemented and verified in `programs/finite_difference_derivatives.py` against analytical test function $f(x) = \sin(x) e^{-x/5}$ at $x = 1.0$:
-- Forward/Backward error ratio as $h \to h/2 \approx 2.00$ ($\\mathcal{O}(h)$ verified).
-- Central first and second derivative error ratio as $h \to h/2 \approx 4.00$ ($\\mathcal{O}(h^2)$ verified).
+In time only the solution at the current level is known, so the derivative is approximated by a one-sided difference over one time step $\Delta\tau$. From (1.1) with $h = \Delta\tau$:
+
+$$
+\frac{\partial V}{\partial \tau}(S,\tau) = \frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} - \frac{\Delta\tau}{2} \frac{\partial^2 V}{\partial \tau^2}(S,\tau) + O(\Delta\tau^2). \tag{1.7}
+$$
+
+If this quotient is regarded as an approximation at the *end* of the interval, $\tau+\Delta\tau$, it is still $O(\Delta\tau)$ (fully implicit method, Part 4). If it is regarded as an approximation at the *midpoint* $\tau + \Delta\tau/2$, expansion about the midpoint makes the first-order term vanish by symmetry and the error becomes $O(\Delta\tau^2)$ (Crank–Nicolson method, Part 5):
+
+$$
+\frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} = \frac{\partial V}{\partial \tau}\Big(S,\tau+\tfrac{\Delta\tau}{2}\Big) + \frac{\Delta\tau^2}{24} \frac{\partial^3 V}{\partial \tau^3} + O(\Delta\tau^4). \tag{1.8}
+$$
+
+---
+
+## 1.7 The computational grid
+
+The Black–Scholes problem is solved on the truncated domain $0 \le S \le S_{\max}$, $0 \le \tau \le T$ (the reason for the truncation and the choice $S_{\max}=5K$ are explained in Parts 2 and 6). Both intervals are divided uniformly:
+
+$$
+\Delta S = \frac{S_{\max}}{M}, \qquad S_j = j\,\Delta S, \qquad j = 0,1,\dots,M, \tag{1.9}
+$$
+
+$$
+\Delta\tau = \frac{T}{N}, \qquad \tau_n = n\,\Delta\tau, \qquad n = 0,1,\dots,N. \tag{1.10}
+$$
+
+The numerical solution is the array
+
+$$
+V_j^n \approx V(S_j, \tau_n).
+$$
+
+* $j = 0$ and $j = M$ are **boundary nodes** (values prescribed by boundary conditions);
+* $j = 1,\dots,M-1$ are the $M-1$ **interior unknowns**;
+* $n = 0$ is the payoff (option expiry), $n = N$ is today ($\tau = T$, i.e. $t=0$).
+
+At an interior node the stencils (1.5) and (1.6) with $h = \Delta S$ read
+
+$$
+\frac{\partial V}{\partial S}\Big|_j^n \approx \frac{V_{j+1}^n - V_{j-1}^n}{2\Delta S}, \qquad
+\frac{\partial^2 V}{\partial S^2}\Big|_j^n \approx \frac{V_{j+1}^n - 2V_j^n + V_{j-1}^n}{(\Delta S)^2}, \tag{1.11}
+$$
+
+both with error $O(\Delta S^2)$. Each uses only the three neighbours $V_{j-1}, V_j, V_{j+1}$ — the property that later makes every linear system **tridiagonal** (Part 3).
+
+**Strike alignment.** If $K/\Delta S$ is an integer, the strike is a grid node $S_{j_K} = K$ with $j_K = K/\Delta S$. With $S_{\max} = 5K$ this holds for every $M$ divisible by 5, in particular for all $M \in \{50,100,200,400\}$ used in the refinement studies ($j_K = M/5$).
+
+---
+
+## 1.8 Significance
+
+| Formula | Stencil | Error | Used for |
+|---|---|---|---|
+| $D_+ f$ | $f(x), f(x+h)$ | $O(h)$ | — (reference) |
+| $D_- f$ | $f(x-h), f(x)$ | $O(h)$ | — (reference) |
+| $D_0 f$ | $f(x\pm h)$ | $O(h^2)$ | $V_S$ in the PDE, Delta (Part 7) |
+| $D_+D_- f$ | $f(x-h), f(x), f(x+h)$ | $O(h^2)$ | $V_{SS}$ in the PDE, Gamma (Part 7) |
+| one-sided in $\tau$ | $V^n, V^{n+1}$ | $O(\Delta\tau)$ at $\tau_{n+1}$, $O(\Delta\tau^2)$ at $\tau_{n+1/2}$ | time stepping (Parts 4, 5) |
+
+The order of a formula is visible numerically: halving $h$ divides an $O(h^p)$ error by $2^p$, so the **observed order**
+
+$$
+p = \frac{\log(E_h / E_{h/2})}{\log 2} \tag{1.12}
+$$
+
+should approach 1 for one-sided and 2 for central formulas.
+
+---
+
+## 1.9 Implementation and verification
+
+| Equation | Code |
+|---|---|
+| (1.3), (1.4), (1.5), (1.6) | `forward_diff`, `backward_diff`, `central_diff_first`, `central_diff_second` in `finite_difference_derivatives.py` |
+| (1.9), (1.10) | `generate_s_grid`, `generate_tau_grid` in `generate_grid.py` |
+| strike node $j_K$ | `strike_index` in `generate_grid.py` |
+
+`finite_difference_derivatives.py` tests the formulas on $f(x) = \sin x\, e^{-x/5}$ at $x_0 = 1$, where all derivatives are known in closed form. Observed orders (from `results/02_finite_differences.txt`):
+
+| $h$ | forward | $p$ | central | $p$ | second diff. | $p$ |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.2 | 8.34e-02 | – | 1.19e-04 | – | 2.88e-03 | – |
+| 0.1 | 4.19e-02 | 1.00 | 3.07e-05 | 1.96 | 7.20e-04 | 2.00 |
+| 0.05 | 2.10e-02 | 1.00 | 7.72e-06 | 1.99 | 1.80e-04 | 2.00 |
+| 0.025 | 1.05e-02 | 1.00 | 1.93e-06 | 2.00 | 4.50e-05 | 2.00 |
+
+The program also applies $D_0$ and $D_+D_-$ to the *analytical* Black–Scholes call at $S=K$: with exact prices as input the stencil errors for Delta and Gamma are again exactly second order (e.g. $\Delta S = 1$: $8.6\times10^{-5}$ and $2.3\times10^{-6}$). This isolates the stencil error from the PDE error that is added in Part 7.
+
+`generate_grid.py` checks the grid end-points, uniform spacing, the position of $\tau=0$ (payoff) and $\tau=T$ (valuation), and the strike node (all reported as PASS).
+
+![Truncation error of the finite-difference formulas](../figures/fig01_fd_truncation_error.png)

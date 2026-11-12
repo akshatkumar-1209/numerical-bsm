@@ -1,0 +1,59 @@
+============================================================================================
+  PAYOFF KINK, CRANK-NICOLSON OSCILLATIONS AND IMPLICIT START-UP
+  K = 100, T = 1, r = 0.05, sigma = 0.2; S_max = 500, option = call
+  strike window [K - 10, K + 10];  exact Gamma(K) = 0.018762
+============================================================================================
+
+  [1] OSCILLATING REGIME  M = 800, N = 25  (dS = 0.625, dtau = 0.04, lambda_K = 41.0)
+      stiff-mode factors:  G_CN = -0.952 per step,  two BE half-steps = 5.68e-04
+
+  Values at nodes around the strike
+        S |      V_BS Fully imp   Pure CN Improved  |    D_BS Fully imp   Pure CN Improved  |    G_BS Fully imp   Pure CN Improved 
+    95.00 |   7.51087   7.47568   7.51025   7.50952 |  0.5373    0.5349    0.5371    0.5372 |  0.0209    0.0212    0.0206    0.0209
+    96.25 |   8.19867   8.16081   8.19773   8.19729 |  0.5631    0.5612    0.5630    0.5631 |  0.0205    0.0208    0.0211    0.0205
+    97.50 |   8.91843   8.87840   8.91853   8.91703 |  0.5884    0.5868    0.5903    0.5884 |  0.0200    0.0203    0.0212    0.0200
+    98.75 |   9.66937   9.62768   9.66817   9.66798 |  0.6130    0.6118    0.6005    0.6130 |  0.0194    0.0197   -0.0065    0.0193
+   100.00 |  10.45058  10.40774  10.47353  10.44914 |  0.6368    0.6361    0.6369    0.6368 |  0.0188    0.0191   -0.1702    0.0190
+   101.25 |  11.26111  11.21760  11.25969  11.25972 |  0.6599    0.6595    0.6722    0.6598 |  0.0181    0.0184   -0.0061    0.0181
+   102.50 |  12.09991  12.05620  12.10022  12.09851 |  0.6821    0.6820    0.6802    0.6820 |  0.0174    0.0177    0.0181    0.0174
+   103.75 |  12.96588  12.92243  12.96505  12.96451 |  0.7034    0.7037    0.7033    0.7033 |  0.0167    0.0169    0.0175    0.0167
+   105.00 |  13.85791  13.81511  13.85740  13.85656 |  0.7237    0.7244    0.7239    0.7237 |  0.0159    0.0162    0.0157    0.0159
+
+  Error summary on [K - 10, K + 10]
+  Method           |V(K) err|        E_V    E_Delta    E_Gamma   Gamma(K)  min Gamma spur.ext
+  Fully implicit    4.285e-02  4.370e-02  3.586e-03  3.246e-04    0.01908   1.30e-02        0
+  Pure CN           2.294e-02  2.294e-02  1.953e-02  1.889e-01   -0.17017  -1.70e-01        8
+  Improved CN       1.440e-03  1.440e-03  7.060e-05  2.064e-04    0.01897   1.29e-02        0
+
+  [2] EFFECT OF THE TIME STEP  (M = 800 fixed, dS = 0.625)
+      N  lambda_K    G_CN |        Fully implicit        |           Pure CN            |         Improved CN         
+                          |   E_Gamma  Gamma(K)  ext     |   E_Gamma  Gamma(K)  ext     |   E_Gamma  Gamma(K)  ext    
+     10     102.4  -0.981 |  8.32e-04   0.01957    1     |  8.51e-01   0.86963    6     |  5.60e-04   0.01820    0    
+     25      41.0  -0.952 |  3.25e-04   0.01908    0     |  1.89e-01  -0.17017    8     |  2.06e-04   0.01897    0    
+     50      20.5  -0.907 |  1.62e-04   0.01892    0     |  2.83e-03   0.02159    8     |  9.73e-06   0.01876    0    
+    100      10.2  -0.822 |  8.23e-05   0.01884    0     |  2.74e-06   0.01876    0     |  3.13e-06   0.01876    0    
+    200       5.1  -0.673 |  4.26e-05   0.01880    0     |  2.97e-06   0.01876    0     |  3.07e-06   0.01876    0    
+
+  [3] EFFECT OF SPATIAL REFINEMENT  (N = 25 fixed, dtau = 0.04)
+      M      dS  lambda_K |        Fully implicit        |           Pure CN            |         Improved CN         
+                          |   E_Gamma  Gamma(K)  ext     |   E_Gamma  Gamma(K)  ext     |   E_Gamma  Gamma(K)  ext    
+    200  2.5000       2.6 |  3.73e-04   0.01912    0     |  4.38e-05   0.01880    0     |  5.01e-05   0.01881    0    
+    400  1.2500      10.2 |  3.34e-04   0.01909    0     |  1.39e-03   0.01738    6     |  2.85e-05   0.01879    0    
+    800  0.6250      41.0 |  3.25e-04   0.01908    0     |  1.89e-01  -0.17017    8     |  2.06e-04   0.01897    0    
+   1600  0.3125     163.8 |  3.22e-04   0.01907    0     |  1.39e+00  -1.37203    8     |  2.38e-04   0.01900    2    
+
+  [4] START-UP VARIANT  (M = 800): number of CN intervals replaced by two BE half-steps
+      N               start-up  |V(K) err|    E_Delta    E_Gamma spur.ext
+     10    1 interval (2 half)   3.330e-03  3.678e-04  5.603e-04        0
+     10   2 intervals (4 half)   9.025e-03  6.208e-04  5.311e-05        0
+     25    1 interval (2 half)   1.440e-03  7.060e-05  2.064e-04        0
+     25   2 intervals (4 half)   2.248e-03  1.293e-04  1.058e-05        0
+
+  [5] COMPUTATIONAL COST  (M = 800, N = 25; median of 5 runs)
+  Method           tridiagonal solves  time [ms]
+  Fully implicit                   25        8.1
+  Pure CN                          25        8.4
+  Improved CN                      26        8.7
+
+  Figure saved: ../figures/fig09_kink_price_delta_gamma.png
+  Figure saved: ../figures/fig10_kink_refinement.png

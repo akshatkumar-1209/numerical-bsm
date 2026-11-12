@@ -1,0 +1,24 @@
+====================================================================================
+  FINITE-DIFFERENCE APPROXIMATIONS:  f(x) = sin(x) exp(-x/5),  x0 = 1
+  exact f'(x0) = 0.304574479156    exact f''(x0) = -0.838325491671
+====================================================================================
+          h     forward     p    backward     p     central     p  2nd deriv.     p
+    0.20000   8.343e-02         8.366e-02         1.190e-04         2.878e-03      
+    0.10000   4.185e-02  1.00   4.191e-02  1.00   3.065e-05  1.96   7.201e-04  2.00
+    0.05000   2.095e-02  1.00   2.096e-02  1.00   7.720e-06  1.99   1.801e-04  2.00
+    0.02500   1.048e-02  1.00   1.048e-02  1.00   1.933e-06  2.00   4.502e-05  2.00
+    0.01250   5.239e-03  1.00   5.240e-03  1.00   4.836e-07  2.00   1.126e-05  2.00
+    0.00625   2.620e-03  1.00   2.620e-03  1.00   1.209e-07  2.00   2.814e-06  2.00
+    0.00313   1.310e-03  1.00   1.310e-03  1.00   3.023e-08  2.00   7.035e-07  2.00
+  Observed orders p = log2(E_h / E_h/2):  one-sided -> 1,  central and second difference -> 2.
+
+  Stencils applied to the Black-Scholes call C(S) at S = K = 100   (Delta = 0.636831, Gamma = 0.018762)
+       dS  D0 C - Delta     p  D+D- C - Gamma     p
+     8.00     5.357e-03             1.479e-04      
+     4.00     1.367e-03  1.97       3.681e-05  2.01
+     2.00     3.434e-04  1.99       9.190e-06  2.00
+     1.00     8.596e-05  2.00       2.297e-06  2.00
+     0.50     2.150e-05  2.00       5.741e-07  2.00
+  These are the stencil errors alone (exact prices as input); Part 7 adds the PDE error.
+
+  Figure saved: ../figures/fig01_fd_truncation_error.png

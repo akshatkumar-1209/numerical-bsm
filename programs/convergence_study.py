@@ -1,353 +1,239 @@
 """
-convergence_study.py  —  Weeks 7 & 8
-======================================
-Systematic spatial and temporal refinement study for the
-Fully Implicit and Crank-Nicolson Black-Scholes FDM solvers.
+convergence_study.py -- Verification, convergence and domain truncation (Derivation Part 6)
 
-Parameters (standard benchmark):
-  K=100, T=1, r=0.05, sigma=0.20, S_max=400
+Benchmark K=100, T=1, r=0.05, sigma=0.20, evaluated at S = K; S_max = 5K.
 
-Outputs
--------
-1. Price comparison tables (FDM vs analytical, multiple S-nodes)
-2. Spatial convergence table  (fixed N=5000, vary M)
-3. Temporal convergence table (same-grid Richardson reference: fixed M=200, vary N,
-   reference N_ref=12800 on same grid to isolate temporal error)
-4. Observed orders of convergence (log2 of error ratios)
+  [1] Price verification table   S, V_BS, V_Imp, V_CN               (M = N = 400)
+  [2] Independent SPATIAL refinement   M = 50,100,200,400   with N = 20000 fixed
+        error against the analytical Black-Scholes solution
+  [3] Independent TEMPORAL refinement  N = 50,100,200,400   with M = 400 fixed
+        (a) error against a same-grid reference V(M, N_ref = 12800)  -> isolates time error
+        (b) error against the analytical solution                    -> shows the spatial floor
+  [4] Paired refinement  (M,N) = (50,50),(100,100),(200,200),(400,400)
+  [5] Domain truncation  S_max = 2K, 3K, 4K, 5K  at fixed dS = 1.25, N = 400
+  [6] Final verification table  (method, ||e||_inf, ||e||_2, orders, oscillation)
 
-Note on temporal study design
-------------------------------
-Using an external analytical solution as the reference conflates the remaining
-spatial discretisation error with the temporal error being measured.  When the
-spatial floor (~6e-4 for M=800) is comparable to or larger than the temporal
-error at fine N, the apparent convergence order collapses to zero.
+Error norms (interior nodes j = 1..M-1):
+    ||e||_inf = max_j |e_j|,     ||e||_2 = ( dS sum_j e_j^2 )^{1/2}
+Observed order:  p = log(E_h / E_{h/2}) / log 2
 
-The correct procedure is to fix M (here M=200) and compare V(M,N) against a
-reference solution V(M, N_ref) computed on the SAME spatial grid with a very
-large N_ref (12800).  Both solutions share the same spatial discretisation, so
-the difference isolates the temporal component.  This gives clean orders:
-Implicit O(dt^1), CN O(dt^2).
-
-Author: Akshat Kumar
+Usage
+-----
+    python convergence_study.py            (about 1 minute)
 """
 
+import argparse
+import os
+import time
+from math import log2
+
 import numpy as np
-from math import log, sqrt, exp, erf, pi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Analytical Black-Scholes
-# ─────────────────────────────────────────────────────────────────────────────
+from black_scholes import bs_price, bs_price_vec
+from crank_nicolson import crank_nicolson_solver
+from generate_grid import strike_index
+from implicit_fdm import error_norms, implicit_solver
+from numerical_greeks import compute_greeks, oscillation_count
+from parameters import BENCH, FIG_DIR, S_MAX_FACTOR, figure_path
 
-def _N(x):
-    return 0.5 * (1.0 + erf(x / sqrt(2.0)))
+SOLVERS = (("Fully implicit", implicit_solver, 1),
+           ("Crank-Nicolson", lambda *a: crank_nicolson_solver(*a, startup=0), 2))
 
-def _n(x):
-    return exp(-0.5 * x * x) / sqrt(2.0 * pi)
 
-def bs_call(S, K, T, r, sigma):
-    if T <= 0:
-        return max(S - K, 0.0)
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    d2 = d1 - sigma * sqrt(T)
-    return S * _N(d1) - K * exp(-r * T) * _N(d2)
+def order(e_prev, e):
+    return log2(e_prev / e) if e_prev is not None and e > 0 else float("nan")
 
-def bs_put(S, K, T, r, sigma):
-    c = bs_call(S, K, T, r, sigma)
-    return c - S + K * exp(-r * T)
 
-def bs_price(S, K, T, r, sigma, opt):
-    return bs_call(S, K, T, r, sigma) if opt == 'call' else bs_put(S, K, T, r, sigma)
+def fmt_p(p):
+    return "   -  " if np.isnan(p) else f"{p:6.2f}"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Thomas Algorithm (tridiagonal solver)
-# ─────────────────────────────────────────────────────────────────────────────
 
-def thomas(a, b, c, d):
-    """Solve tridiagonal system.  a=lower, b=main, c=upper, d=rhs."""
-    n = len(b)
-    b, d = b.copy(), d.copy()
-    x = np.zeros(n)
-    for i in range(1, n):
-        m = a[i] / b[i - 1]
-        b[i] -= m * c[i - 1]
-        d[i] -= m * d[i - 1]
-    x[-1] = d[-1] / b[-1]
-    for i in range(n - 2, -1, -1):
-        x[i] = (d[i] - c[i] * x[i + 1]) / b[i]
-    return x
+def main():
+    pa = argparse.ArgumentParser(description="Convergence and domain-truncation study")
+    pa.add_argument("--no-plot", action="store_true")
+    pa.add_argument("--option", default="call", choices=["call", "put"])
+    a = pa.parse_args()
+    K, T, r, sig, S0 = BENCH["K"], BENCH["T"], BENCH["r"], BENCH["sigma"], BENCH["S0"]
+    Smax, opt = S_MAX_FACTOR * K, a.option
+    exact0 = bs_price(S0, K, T, r, sig, opt)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Fully Implicit Solver
-# ─────────────────────────────────────────────────────────────────────────────
+    print("=" * 86)
+    print("  VERIFICATION AND CONVERGENCE STUDY")
+    print(f"  K = {K:g}, T = {T:g}, r = {r:g}, sigma = {sig:g}, S_max = {Smax:g}, option = {opt}")
+    print(f"  Analytical value at S = {S0:g}:  {exact0:.6f}")
+    print("=" * 86)
 
-def solve_implicit(K, T, r, sigma, Smax, M, N, opt='call'):
-    """
-    Backward-Euler (fully implicit) finite-difference solver.
-    Accuracy: O(dS^2) spatial, O(dt) temporal.
-    Backward Euler is A-stable for the scalar test equation; matrix properties depend on the discretized operator.
-    """
-    dS = Smax / M
-    dt = T / N
-    S  = np.linspace(0, Smax, M + 1)
-    V  = np.maximum(S - K, 0.0) if opt == 'call' else np.maximum(K - S, 0.0)
-    Sj = np.arange(1, M) * dS
+    # [1] ---------------------------------------------------------------------------------------
+    M1 = N1 = 400
+    S, Vi = implicit_solver(K, T, r, sig, Smax, M1, N1, opt)
+    _, Vc = crank_nicolson_solver(K, T, r, sig, Smax, M1, N1, opt)
+    print(f"\n  [1] PRICE VERIFICATION  (M = {M1}, N = {N1}, dS = {Smax / M1:g}, dtau = {T / N1:g})")
+    print(f"  {'S':>7} {'V_BS':>11} {'V_Imp':>11} {'err_Imp':>10} {'V_CN':>11} {'err_CN':>10}")
+    for s in (70, 80, 90, 95, 100, 105, 110, 120, 130):
+        j = strike_index(s, Smax, M1)
+        vb = bs_price(s, K, T, r, sig, opt)
+        print(f"  {s:>7.1f} {vb:>11.6f} {Vi[j]:>11.6f} {Vi[j] - vb:>10.2e} {Vc[j]:>11.6f} {Vc[j] - vb:>10.2e}")
 
-    al = 0.5 * sigma**2 * Sj**2 / dS**2 - 0.5 * r * Sj / dS
-    be = -sigma**2 * Sj**2 / dS**2 - r
-    ga = 0.5 * sigma**2 * Sj**2 / dS**2 + 0.5 * r * Sj / dS
+    # [2] ---------------------------------------------------------------------------------------
+    N_sp, Ms = 20000, (50, 100, 200, 400)
+    print(f"\n  [2] INDEPENDENT SPATIAL REFINEMENT  (N = {N_sp} fixed; error vs analytical solution)")
+    spatial = {}
+    for name, f, _ in SOLVERS:
+        print(f"  --- {name}   (expected p = 2)")
+        print(f"  {'M':>5} {'dS':>7} {'|e(K)|':>10} {'||e||_inf':>11} {'p_inf':>6} {'||e||_2':>11} {'p_2':>6}")
+        pi = p2 = None
+        rows = []
+        for M in Ms:
+            S, V = f(K, T, r, sig, Smax, M, N_sp, opt)
+            einf, e2 = error_norms(S, V, K, T, r, sig, opt)
+            eK = abs(V[strike_index(S0, Smax, M)] - exact0)
+            print(f"  {M:>5} {Smax / M:>7.3f} {eK:>10.3e} {einf:>11.3e} {fmt_p(order(pi, einf))} {e2:>11.3e} {fmt_p(order(p2, e2))}")
+            rows.append((Smax / M, einf, e2)); pi, p2 = einf, e2
+        spatial[name] = np.array(rows)
 
-    a = -dt * al
-    b = 1.0 - dt * be
-    c = -dt * ga
+    # [3] ---------------------------------------------------------------------------------------
+    M_t, N_ref, Ns = 400, 12800, (50, 100, 200, 400)
+    S, Vref = crank_nicolson_solver(K, T, r, sig, Smax, M_t, N_ref, opt, startup=1)
+    jK = strike_index(S0, Smax, M_t)
+    print(f"\n  [3] INDEPENDENT TEMPORAL REFINEMENT  (M = {M_t} fixed, dS = {Smax / M_t:g})")
+    print(f"      reference: same spatial grid, N_ref = {N_ref} (Crank-Nicolson with implicit start-up)")
+    temporal = {}
+    for name, f, p_th in SOLVERS:
+        print(f"  --- {name}   (expected p = {p_th})")
+        print(f"  {'N':>5} {'dtau':>8} {'||e_t||_inf':>12} {'p_inf':>6} {'||e_t||_2':>11} {'p_2':>6} {'|e_t(K)|':>10}"
+              f" {'p_K':>6}   {'||e||_inf vs BS':>15}")
+        pi = p2 = pk = None
+        rows = []
+        for N in Ns:
+            _, V = f(K, T, r, sig, Smax, M_t, N, opt)
+            et = (V - Vref)[1:-1]
+            einf, e2, eK = np.max(np.abs(et)), np.sqrt(Smax / M_t * np.sum(et ** 2)), abs(V[jK] - Vref[jK])
+            ebs, _ = error_norms(S, V, K, T, r, sig, opt)
+            print(f"  {N:>5} {T / N:>8.5f} {einf:>12.3e} {fmt_p(order(pi, einf))} {e2:>11.3e} {fmt_p(order(p2, e2))}"
+                  f" {eK:>10.3e} {fmt_p(order(pk, eK))}   {ebs:>15.3e}")
+            rows.append((T / N, einf, e2, ebs)); pi, p2, pk = einf, e2, eK
+        temporal[name] = np.array(rows)
+    e_sp_floor, _ = error_norms(S, Vref, K, T, r, sig, opt)
+    print(f"  Spatial error of the M = {M_t} grid itself (reference vs analytical): ||e||_inf = {e_sp_floor:.3e}")
 
-    for step in range(N):
-        tau  = (step + 1) * dt
-        V0   = 0.0            if opt == 'call' else K * exp(-r * tau)
-        VM   = (Smax - K * exp(-r * tau)) if opt == 'call' else 0.0
+    # [4] ---------------------------------------------------------------------------------------
+    print("\n  [4] PAIRED REFINEMENT  (M, N) = (50,50) ... (400,400); error vs analytical solution")
+    paired = {}
+    for name, f, _ in SOLVERS:
+        print(f"  --- {name}")
+        print(f"  {'(M, N)':>11} {'|e(K)|':>10} {'||e||_inf':>11} {'p_inf':>6} {'||e||_2':>11} {'p_2':>6} {'time [s]':>9}")
+        pi = p2 = None
+        rows = []
+        for M in Ms:
+            t0 = time.perf_counter()
+            S, V = f(K, T, r, sig, Smax, M, M, opt)
+            dt_run = time.perf_counter() - t0
+            einf, e2 = error_norms(S, V, K, T, r, sig, opt)
+            eK = abs(V[strike_index(S0, Smax, M)] - exact0)
+            print(f"  {f'({M},{M})':>11} {eK:>10.3e} {einf:>11.3e} {fmt_p(order(pi, einf))} {e2:>11.3e}"
+                  f" {fmt_p(order(p2, e2))} {dt_run:>9.3f}")
+            rows.append((Smax / M, einf, e2, eK, S, V)); pi, p2 = einf, e2
+        paired[name] = rows
 
-        rhs        = V[1:M].copy()
-        rhs[0]    -= a[0]  * V0
-        rhs[-1]   -= c[-1] * VM
+    # [5] ---------------------------------------------------------------------------------------
+    dS5, N5 = 1.25, 400
+    print(f"\n  [5] DOMAIN TRUNCATION  (Crank-Nicolson, dS = {dS5} fixed, N = {N5})")
+    print(f"  {'S_max':>6} {'M':>5} {'C(K)':>13} {'C(K) - C_BS':>12} {'P(K)':>13} {'P(K) - P_BS':>12}"
+          f" {'|dC| vs 5K':>11} {'|dP| vs 5K':>11}")
+    dom = {}
+    for fct in (2, 3, 4, 5):
+        Sm = fct * K
+        M = int(round(Sm / dS5))
+        vals = []
+        for o in ("call", "put"):
+            S, V = crank_nicolson_solver(K, T, r, sig, Sm, M, N5, o)
+            vals.append(V[strike_index(K, Sm, M)])
+        dom[fct] = (M, *vals)
+    cb, pb = bs_price(K, K, T, r, sig, "call"), bs_price(K, K, T, r, sig, "put")
+    for fct, (M, c, p) in dom.items():
+        print(f"  {f'{fct}K':>6} {M:>5} {c:>13.9f} {c - cb:>12.3e} {p:>13.9f} {p - pb:>12.3e}"
+              f" {abs(c - dom[5][1]):>11.1e} {abs(p - dom[5][2]):>11.1e}")
+    print("  Changing S_max from 2K to 5K alters V(K) by far less than the discretisation error:")
+    print("  domain truncation is negligible for this benchmark. S_max = 5K is used because it is")
+    print("  conservative and is the only tested domain >= 4K that puts K on a grid node for every")
+    print("  M in {50, 100, 200, 400}  (K/dS = M/5).")
 
-        V[0]   = V0
-        V[1:M] = thomas(a, b, c, rhs)
-        V[M]   = VM
+    # [6] ---------------------------------------------------------------------------------------
+    print("\n  [6] FINAL VERIFICATION TABLE  (M = N = 400, call, S_max = 5K)")
+    print(f"  {'Method':<16} {'||e||_inf':>10} {'||e||_2':>10} {'p_space':>8} {'p_time':>7} {'p_paired':>9} {'spur. extrema':>14}")
+    for name, f, _ in SOLVERS:
+        sp, tp, pr = spatial[name], temporal[name], paired[name]
+        S, V = pr[-1][4], pr[-1][5]
+        Si, _, g = compute_greeks(S, V)
+        print(f"  {name:<16} {pr[-1][1]:>10.3e} {pr[-1][2]:>10.3e} {log2(sp[-2, 1] / sp[-1, 1]):>8.2f}"
+              f" {log2(tp[-2, 1] / tp[-1, 1]):>7.2f} {log2(pr[-2][1] / pr[-1][1]):>9.2f}"
+              f" {oscillation_count(Si, g, K, 0.2 * K, r, sig, T):>14d}")
+    print("  (orders from the finest pair; 'spur. extrema' = spurious local extrema of Gamma in [0.8K, 1.2K])")
 
-    return S, V
+    if a.no_plot:
+        return
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    os.makedirs(FIG_DIR, exist_ok=True)
+    from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
+    col = {"Fully implicit": "C0", "Crank-Nicolson": "C1"}
+    mk = {"Fully implicit": "s", "Crank-Nicolson": "o"}
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Crank-Nicolson Solver
-# ─────────────────────────────────────────────────────────────────────────────
+    def ticks(x, vals):
+        x.xaxis.set_major_locator(FixedLocator(vals)); x.xaxis.set_minor_locator(NullLocator())
+        x.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
 
-def solve_cn(K, T, r, sigma, Smax, M, N, opt='call'):
-    """
-    Crank-Nicolson (theta=1/2) finite-difference solver.
-    Accuracy: O(dS^2) spatial, O(dt^2) temporal.
-    Crank-Nicolson is A-stable for the scalar test equation; matrix properties depend on the discretized operator.
-    """
-    dS = Smax / M
-    dt = T / N
-    S  = np.linspace(0, Smax, M + 1)
-    V  = np.maximum(S - K, 0.0) if opt == 'call' else np.maximum(K - S, 0.0)
-    Sj = np.arange(1, M) * dS
+    fig, ax = plt.subplots(1, 3, figsize=(14, 4.2))
+    for name in col:
+        R = spatial[name]
+        ax[0].loglog(R[:, 0], R[:, 1], "-", color=col[name], marker=mk[name], label=f"{name}  " + r"$\|e\|_\infty$")
+        ax[0].loglog(R[:, 0], R[:, 2], "--", color=col[name], marker=mk[name], mfc="none", label=f"{name}  " + r"$\|e\|_2$")
+    h = spatial["Crank-Nicolson"][:, 0]
+    ax[0].loglog(h, spatial["Crank-Nicolson"][0, 1] * (h / h[0]) ** 2 * 0.5, "k:", label="slope 2")
+    ax[0].set(xlabel=r"$\Delta S$", ylabel="error", title=f"Spatial refinement (N = {N_sp}; FI and CN coincide)")
+    ticks(ax[0], h)
+    for name in col:
+        R = temporal[name]
+        ax[1].loglog(R[:, 0], R[:, 1], "-", color=col[name], marker=mk[name], label=f"{name}: vs same-grid reference")
+        ax[1].loglog(R[:, 0], R[:, 3], ":", color=col[name], marker=mk[name], mfc="none", label=f"{name}: vs analytical")
+    k = temporal["Fully implicit"][:, 0]
+    ax[1].loglog(k, temporal["Fully implicit"][0, 1] * (k / k[0]) * 0.5, "k-.", lw=0.8, label="slope 1")
+    ax[1].loglog(k, temporal["Crank-Nicolson"][0, 1] * (k / k[0]) ** 2 * 0.5, "k:", label="slope 2")
+    ax[1].axhline(e_sp_floor, color="gray", lw=0.8)
+    ax[1].annotate(f"spatial error of the M={M_t} grid", (k[-1], e_sp_floor), xytext=(2, -11),
+                   textcoords="offset points", fontsize=7, color="gray")
+    ax[1].set(xlabel=r"$\Delta\tau$", title=f"Temporal refinement (M = {M_t}), " + r"$\|e\|_\infty$")
+    ticks(ax[1], k)
+    for name in col:
+        R = np.array([row[:4] for row in paired[name]])
+        ax[2].loglog(R[:, 0], R[:, 1], "-", color=col[name], marker=mk[name], label=name)
+    hp = np.array([row[0] for row in paired["Crank-Nicolson"]])
+    ax[2].loglog(hp, paired["Crank-Nicolson"][0][1] * (hp / hp[0]) ** 2 * 0.5, "k:", label="slope 2")
+    ax[2].loglog(hp, paired["Fully implicit"][-1][1] * (hp / hp[-1]) * 1.6, "k-.", lw=0.8, label="slope 1")
+    ax[2].set(xlabel=r"$\Delta S$  (with $\Delta\tau = T/M$)", title=r"Paired refinement $(M,N)=(M,M)$, $\|e\|_\infty$")
+    ticks(ax[2], hp)
+    for x in ax:
+        x.grid(alpha=0.3, which="both"); x.legend(fontsize=7)
+    fig.suptitle(f"K={K:g}, T={T:g}, r={r:g}, sigma={sig:g}, S_max={Smax:g}, {opt}", fontsize=10)
+    fig.tight_layout()
+    out = figure_path("fig05_convergence.png", opt != "call"); fig.savefig(out, dpi=130); plt.close(fig)
+    print(f"\n  Figure saved: {os.path.relpath(out)}")
 
-    al = 0.5 * sigma**2 * Sj**2 / dS**2 - 0.5 * r * Sj / dS
-    be = -sigma**2 * Sj**2 / dS**2 - r
-    ga = 0.5 * sigma**2 * Sj**2 / dS**2 + 0.5 * r * Sj / dS
+    # Figure 4: pointwise error profiles of the paired refinement (shows where the error lives)
+    fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
+    for k_, name in enumerate(col):
+        for row in paired[name]:
+            S, V = row[4], row[5]
+            w = (S >= 0.4 * K) & (S <= 2.0 * K)
+            ax[k_].plot(S[w], V[w] - bs_price_vec(S[w], K, T, r, sig, opt), label=f"M=N={int(round(Smax / row[0]))}")
+        ax[k_].axvline(K, color="gray", ls=":", lw=0.8)
+        ax[k_].set(title=f"{name}: pointwise error", xlabel="S", ylabel=r"$V_{FD}-V_{BS}$")
+        ax[k_].grid(alpha=0.3); ax[k_].legend(fontsize=7)
+    fig.tight_layout()
+    out = figure_path("fig06_pointwise_error_refinement.png", opt != "call"); fig.savefig(out, dpi=130); plt.close(fig)
+    print(f"  Figure saved: {os.path.relpath(out)}")
 
-    h  = 0.5 * dt
-    aL =  -h * al;  bL = 1.0 - h * be;  cL = -h * ga
-    aR =   h * al;  bR = 1.0 + h * be;  cR =  h * ga
 
-    for step in range(N):
-        tn = (step + 1) * dt
-        to = step * dt
-        V0n = 0.0 if opt == 'call' else K * exp(-r * tn)
-        VMn = (Smax - K * exp(-r * tn)) if opt == 'call' else 0.0
-        V0o = 0.0 if opt == 'call' else K * exp(-r * to)
-        VMo = (Smax - K * exp(-r * to)) if opt == 'call' else 0.0
-
-        vi = V[1:M]
-        rhs          = bR * vi
-        rhs[1:]     += aR[1:]  * vi[:-1]
-        rhs[:-1]    += cR[:-1] * vi[1:]
-        rhs[0]      += aR[0]  * V0o - aL[0]  * V0n
-        rhs[-1]     += cR[-1] * VMo - cL[-1] * VMn
-
-        V[0]   = V0n
-        V[1:M] = thomas(aL, bL, cL, rhs)
-        V[M]   = VMn
-
-    return S, V
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Error metrics
-# ─────────────────────────────────────────────────────────────────────────────
-
-def linf_error_vs_analytic(S, V, K, T, r, sigma, opt):
-    """L-infinity error at interior nodes vs analytical solution."""
-    errs = []
-    for j in range(1, len(S) - 1):
-        if S[j] > 0:
-            exact = bs_price(S[j], K, T, r, sigma, opt)
-            errs.append(abs(V[j] - exact))
-    return max(errs) if errs else 0.0
-
-def linf_error_vs_reference(V_coarse, V_ref):
-    """L-infinity error of interior nodes against a reference solution on the same grid."""
-    return np.max(np.abs(V_coarse[1:-1] - V_ref[1:-1]))
-
-def obs_order(e1, e2, h1, h2):
-    """Observed order p from e ~ C*h^p, where h1 is coarse and h2 is fine (h1 > h2)."""
-    if e1 <= 0 or e2 <= 0 or h1 <= h2:
-        return float('nan')
-    return log(e1 / e2) / log(h1 / h2)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN STUDY
-# ─────────────────────────────────────────────────────────────────────────────
-
-if __name__ == '__main__':
-
-    K     = 100.0
-    T     = 1.0
-    r     = 0.05
-    sigma = 0.20
-    Smax  = 400.0
-    opt   = 'call'
-
-    v_exact_atm = bs_call(K, K, T, r, sigma)
-    print("=" * 72)
-    print("  NUMERICAL BLACK-SCHOLES FDM — WEEKS 7 & 8")
-    print("  Systematic Verification & Convergence Analysis")
-    print("=" * 72)
-    print(f"  Parameters: K={K}, T={T}, r={r}, sigma={sigma}, Smax={Smax}")
-    print(f"  Analytical call at S=K={K}: {v_exact_atm:.8f}")
-    print()
-
-    # ─── WEEK 7: PRICE COMPARISON TABLE ────────────────────────────────────
-    print("=" * 72)
-    print("  WEEK 7 — PRICE COMPARISON TABLES (FDM vs Analytical)")
-    print("=" * 72)
-
-    for solver_name, solver in [("Fully Implicit (M=200, N=1000)", solve_implicit),
-                                  ("Crank-Nicolson (M=200, N=500)",  solve_cn)]:
-        M_t = 200; N_t = (1000 if 'Implicit' in solver_name else 500)
-        dS_t = Smax / M_t
-        S_g, V_g = solver(K, T, r, sigma, Smax, M_t, N_t, opt)
-        print(f"\n  Solver : {solver_name}")
-        print(f"  dS={dS_t:.2f},  dt={T/N_t:.5f}")
-        print(f"\n  {'S':>8}  {'FDM Price':>12}  {'Exact Price':>12}  {'|Error|':>11}  {'Rel Err %':>10}")
-        print("  " + "-" * 60)
-        for S_req in [60, 70, 80, 90, 100, 110, 120, 140, 160, 200]:
-            j = min(M_t, max(1, round(S_req / dS_t)))
-            s   = S_g[j]
-            v   = V_g[j]
-            ex  = bs_price(s, K, T, r, sigma, opt)
-            err = abs(v - ex)
-            rel = 100 * err / ex if ex > 1e-12 else float('nan')
-            print(f"  {s:>8.1f}  {v:>12.6f}  {ex:>12.6f}  {err:>11.4e}  {rel:>10.4f}")
-        # Also show put
-        S_gp, V_gp = solver(K, T, r, sigma, Smax, M_t, N_t, 'put')
-        print(f"\n  [Put option, same grid]")
-        print(f"  {'S':>8}  {'FDM Price':>12}  {'Exact Price':>12}  {'|Error|':>11}")
-        print("  " + "-" * 50)
-        for S_req in [60, 80, 100, 120, 160]:
-            j = min(M_t, max(1, round(S_req / dS_t)))
-            s   = S_gp[j]
-            v   = V_gp[j]
-            ex  = bs_price(s, K, T, r, sigma, 'put')
-            err = abs(v - ex)
-            print(f"  {s:>8.1f}  {v:>12.6f}  {ex:>12.6f}  {err:>11.4e}")
-
-    # ─── WEEK 8: CONVERGENCE ANALYSIS ──────────────────────────────────────
-    print()
-    print("=" * 72)
-    print("  WEEK 8 — CONVERGENCE ANALYSIS")
-    print("=" * 72)
-
-    M_values   = [25, 50, 100, 200, 400]
-    N_spatial  = 5000   # large N: temporal error negligible -> isolates spatial order
-
-    # ── 8a: Spatial convergence ──
-    print("\n  [8a] SPATIAL CONVERGENCE STUDY (N=5000 fixed, vary M)")
-    print("       Large N ensures temporal error is negligible.")
-    print("       Expected: O(dS^2) -> error ratios ~4.0")
-    print("       Note: M=50 (dS=8) has K between nodes -> ratio irregular (grid alignment effect).")
-    print()
-
-    for solver_name, solver in [("Fully Implicit", solve_implicit),
-                                  ("Crank-Nicolson", solve_cn)]:
-        print(f"  --- {solver_name} ---")
-        print(f"  {'M':>6}  {'dS':>8}  {'L-inf Error':>13}  {'Ratio':>8}  {'Obs. Order':>12}")
-        print("  " + "-" * 56)
-        prev_e, prev_dS = None, None
-        for M in M_values:
-            dS = Smax / M
-            S_g, V_g = solver(K, T, r, sigma, Smax, M, N_spatial, opt)
-            e = linf_error_vs_analytic(S_g, V_g, K, T, r, sigma, opt)
-            ratio = prev_e / e if prev_e and e > 0 else float('nan')
-            order = obs_order(prev_e, e, prev_dS, dS) if prev_e else float('nan')
-            note = "  <- K not on grid" if M == 50 else ""
-            print(f"  {M:>6}  {dS:>8.2f}  {e:>13.5e}  {ratio:>8.2f}  {order:>12.3f}{note}")
-            prev_e, prev_dS = e, dS
-        print()
-
-    # ── 8b: Temporal convergence — same-grid Richardson reference ──
-    print("  [8b] TEMPORAL CONVERGENCE STUDY")
-    print("       Method: same-grid Richardson reference (M=200 fixed, N_ref=12800).")
-    print("       Error = max|V(M,N) - V(M, N_ref)| over interior nodes.")
-    print("       This isolates temporal error; both solutions share the same spatial grid.")
-    print("       Expected: Implicit O(dt^1) -> ratios ~2.0")
-    print("                 CN       O(dt^2) -> ratios ~4.0")
-    print()
-
-    M_temporal = 200    # fixed spatial grid
-    N_ref      = 12800  # reference: very fine in time, same spatial grid
-    N_values   = [50, 100, 200, 400, 800]
-
-    for solver_name, solver, exp_order in [("Fully Implicit", solve_implicit, 1),
-                                             ("Crank-Nicolson", solve_cn,       2)]:
-        print(f"  --- {solver_name}  [expected O(dt^{exp_order})] ---")
-        print(f"  {'N':>6}  {'dt':>10}  {'L-inf Error':>13}  {'Ratio':>8}  {'Obs. Order':>12}")
-        print("  " + "-" * 58)
-
-        # Compute reference on same spatial grid
-        _, V_ref = solver(K, T, r, sigma, Smax, M_temporal, N_ref, opt)
-
-        prev_e, prev_dt = None, None
-        for N in N_values:
-            dt = T / N
-            S_g, V_g = solver(K, T, r, sigma, Smax, M_temporal, N, opt)
-            e = linf_error_vs_reference(V_g, V_ref)
-            ratio = prev_e / e if prev_e and e > 0 else float('nan')
-            order = obs_order(prev_e, e, prev_dt, dt) if prev_e else float('nan')
-            print(f"  {N:>6}  {dt:>10.5f}  {e:>13.5e}  {ratio:>8.2f}  {order:>12.3f}")
-            prev_e, prev_dt = e, dt
-        print()
-
-    # ── 8c: Summary interpretation ──
-    print("  [8c] INTERPRETATION")
-    print("  " + "-" * 68)
-    print("""
-  Spatial order (both methods):
-    Both Fully Implicit and Crank-Nicolson use central differences in S,
-    giving O(dS^2) spatial truncation error.  Halving dS (M->2M) should
-    reduce the error by a factor of ~4.  The tables confirm ratios of
-    approximately 4.0 once K lies on a grid node.  The M=50 anomaly
-    (dS=8, K=100 falls between nodes) causes the ratio to appear irregular
-    — this is a grid-alignment effect, not a solver defect.
-
-  Temporal order (same-grid Richardson reference):
-    Fixing M=200 and comparing V(M,N) against V(M, 12800) on the same
-    spatial grid cleanly isolates the temporal component of the error.
-
-    Fully Implicit uses Backward Euler (theta=1), giving O(dt) temporal
-    accuracy.  Halving N (dt->dt/2) reduces the error by a factor of ~2.0,
-    confirming first-order convergence in time.
-
-    Crank-Nicolson uses the trapezoid rule (theta=1/2), giving O(dt^2)
-    temporal accuracy.  Halving N reduces the error by a factor of ~4.0,
-    confirming second-order convergence in time.
-
-    Important note: measuring temporal error against an external analytical
-    solution on a large M (e.g. M=800) can produce misleading results when
-    the spatial floor (~6e-4 for M=800) is comparable to the temporal error
-    at fine N.  The CN error then appears to stall at ~6e-4 regardless of N,
-    giving an apparent convergence order of zero.  The same-grid reference
-    avoids this artefact entirely.
-
-  Stability:
-    Backward Euler and Crank-Nicolson are A-stable scalar methods. Matrix
-    stability and dominance depend on the discrete operator and coefficients;
-    Thomas elimination solves the tested systems but does not prove scheme stability.
-
-  Practical recommendation:
-    For equivalent computational cost (same M*N), Crank-Nicolson achieves
-    significantly smaller errors than the Fully Implicit method due to its
-    superior O(dt^2) temporal accuracy.
-  """)
-
-    print("=" * 72)
-    print("  CONVERGENCE STUDY COMPLETE")
-    print("=" * 72)
+if __name__ == "__main__":
+    main()

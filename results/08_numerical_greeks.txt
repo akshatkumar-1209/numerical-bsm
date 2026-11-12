@@ -1,0 +1,68 @@
+====================================================================================
+  NUMERICAL GREEKS: CENTRAL DIVIDED DIFFERENCES ON THE FD PRICE
+  K = 100, T = 1, r = 0.05, sigma = 0.2;  S_max = 500, M = 400, N = 400, dS = 1.25
+====================================================================================
+
+  [1] Greeks at S = S0 (benchmark: call Delta 0.636831, put Delta -0.363169, Gamma 0.018762)
+  Method           option    Delta_FD    Delta_BS     |err|    Gamma_FD    Gamma_BS     |err|
+  Fully implicit   call     0.636687    0.636831  1.44e-04    0.018793    0.018762  3.05e-05
+  Fully implicit   put     -0.363313   -0.363169  1.44e-04    0.018793    0.018762  3.05e-05
+  Crank-Nicolson   call     0.636733    0.636831  9.75e-05    0.018773    0.018762  1.13e-05
+  Crank-Nicolson   put     -0.363267   -0.363169  9.75e-05    0.018773    0.018762  1.13e-05
+  Improved CN      call     0.636733    0.636831  9.75e-05    0.018773    0.018762  1.13e-05
+  Improved CN      put     -0.363267   -0.363169  9.75e-05    0.018773    0.018762  1.13e-05
+
+  Call Greeks across the strike region (Crank-Nicolson)
+        S   Delta_BS   Delta_FD        err    Gamma_BS   Gamma_FD        err
+     80.0   0.221922   0.221868  -5.41e-05    0.018598   0.018588  -1.02e-05
+     90.0   0.429832   0.429685  -1.47e-04    0.021820   0.021828   8.34e-06
+     95.0   0.537260   0.537128  -1.32e-04    0.020905   0.020917   1.20e-05
+    100.0   0.636831   0.636733  -9.75e-05    0.018762   0.018773   1.13e-05
+    105.0   0.723727   0.723668  -5.98e-05    0.015925   0.015933   8.00e-06
+    110.0   0.795754   0.795724  -2.97e-05    0.012887   0.012891   4.01e-06
+    120.0   0.896455   0.896453  -1.90e-06    0.007500   0.007499  -1.44e-06
+
+  [2] Price-Delta-Gamma error hierarchy (max-norm over 50 <= S <= 150)
+  Method           option        E_V    E_Delta    E_Gamma  spurious extrema
+  Fully implicit   call    6.49e-03   3.80e-04   4.30e-05                 0
+  Fully implicit   put     6.19e-03   3.80e-04   4.30e-05                 0
+  Crank-Nicolson   call    3.90e-03   1.86e-04   1.84e-05                 0
+  Crank-Nicolson   put     3.90e-03   1.86e-04   1.84e-05                 0
+  Improved CN      call    3.91e-03   1.86e-04   1.84e-05                 0
+  Improved CN      put     3.91e-03   1.86e-04   1.84e-05                 0
+
+  [3] Spatial mesh refinement for the Greeks (call, N = 4000 fixed, max-norm over [50, 150])
+  --- Fully implicit
+      M      dS        E_V    p_V    E_Delta    p_D    E_Gamma    p_G
+     50  10.000  2.611e-01         9.599e-03         9.103e-04       
+    100   5.000  6.275e-02   2.06  2.917e-03   1.72  2.895e-04   1.65
+    200   2.500  1.590e-02   1.98  7.483e-04   1.96  7.595e-05   1.93
+    400   1.250  4.152e-03   1.94  1.981e-04   1.92  2.079e-05   1.87
+  --- Crank-Nicolson
+      M      dS        E_V    p_V    E_Delta    p_D    E_Gamma    p_G
+     50  10.000  2.608e-01         9.577e-03         9.089e-04       
+    100   5.000  6.248e-02   2.06  2.907e-03   1.72  2.871e-04   1.66
+    200   2.500  1.566e-02   2.00  7.375e-04   1.98  7.356e-05   1.96
+    400   1.250  3.906e-03   2.00  1.864e-04   1.98  1.837e-05   2.00
+  --- Improved CN
+      M      dS        E_V    p_V    E_Delta    p_D    E_Gamma    p_G
+     50  10.000  2.608e-01         9.577e-03         9.089e-04       
+    100   5.000  6.248e-02   2.06  2.907e-03   1.72  2.871e-04   1.66
+    200   2.500  1.566e-02   2.00  7.375e-04   1.98  7.356e-05   1.96
+    400   1.250  3.906e-03   2.00  1.864e-04   1.98  1.837e-05   2.00
+
+  [4] Strike alignment (Crank-Nicolson, call, N = 400): K on a node vs K midway between nodes
+      aligned: dS = K/j_K;  off-node: dS = K/(j_K - 1/2), M kept, S_max = M dS (~5K)
+  grid          j_K      dS    S_max   V(K) err  Delta(K) err  Gamma(K) err  E_V window
+  aligned        10 10.0000   500.00   2.61e-01      6.87e-03      8.62e-04    2.61e-01
+  off-node      9.5 10.5263   526.32   2.52e-01      1.53e-02      2.65e-04    9.44e-02
+  aligned        20  5.0000   500.00   6.25e-02      1.59e-03      1.87e-04    6.25e-02
+  off-node     19.5  5.1282   512.82   5.87e-02      3.76e-03      4.98e-05    2.29e-02
+  aligned        40  2.5000   500.00   1.55e-02      3.91e-04      4.56e-05    1.57e-02
+  off-node     39.5  2.5316   506.33   1.43e-02      9.24e-04      1.15e-05    5.58e-03
+  aligned        80  1.2500   500.00   3.86e-03      9.75e-05      1.13e-05    3.90e-03
+  off-node     79.5  1.2579   503.14   3.52e-03      2.28e-04      2.82e-06    1.38e-03
+  (on the off-node grid the values at S = K are linearly interpolated between the two neighbouring nodes)
+
+  Figure saved: ../figures/fig07_numerical_greeks.png
+  Figure saved: ../figures/fig08_greek_convergence.png

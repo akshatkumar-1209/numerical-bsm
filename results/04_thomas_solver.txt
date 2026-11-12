@@ -1,0 +1,13 @@
+============================================================================================
+  THOMAS ALGORITHM VERIFICATION
+============================================================================================
+  Test                                             max|x-x_ref|   max|Ax-d|
+  ----------------------------------------------------------------------------------------
+  1. 6x6 system, exact solution x = (1..6)           8.88e-16    8.88e-16   PASS   (exact)
+  2. random diagonally dominant 200x200              1.11e-16    3.33e-16   PASS   (numpy)
+  3. Black-Scholes fully implicit matrix (M=400)     1.71e-13    9.09e-13   PASS   (numpy)
+     strictly diagonally dominant: True
+  4. Black-Scholes Crank-Nicolson matrix (M=400)     1.71e-13    9.09e-13   PASS   (numpy)
+     strictly diagonally dominant: True
+
+  The Thomas solution agrees with the exact / library solution to round-off level.

@@ -6,3 +6,6 @@ __pycache__/
 .vscode/
 .idea/
 *.xlsx.bak
+
+# exploratory (non-benchmark) runs
+figures/custom_*.png

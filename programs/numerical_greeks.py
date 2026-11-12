@@ -1,298 +1,223 @@
 """
-numerical_greeks.py  —  Week 9
-================================
-Numerical computation of Delta and Gamma from the FDM price surface,
-and comparison with their analytical Black-Scholes counterparts.
+numerical_greeks.py -- Delta and Gamma from the finite-difference price (Derivation Part 7)
 
-Delta (Delta):  dV/dS  — central finite-difference approximation from grid
-Gamma (Gamma):  d²V/dS²  — second-order finite-difference approximation from grid
+Central divided differences on the computed price vector V_j at tau = T:
+    Delta_j = (V_{j+1} - V_{j-1}) / (2 dS)
+    Gamma_j = (V_{j+1} - 2 V_j + V_{j-1}) / dS^2          j = 1..M-1
 
-Studies:
-  1. Delta and Gamma tables vs analytical (call and put, M=400 N=2000)
-  2. Near-strike accuracy at T=1 and T=0.1 (kink more visible at short maturity)
-  3. Delta/Gamma mesh-refinement study: vary M in {50,100,200,400}, confirm O(dS^2)
+Experiments (benchmark K=100, T=1, r=0.05, sigma=0.20, S_max = 5K):
+  1. Analytical vs numerical Delta/Gamma (call and put) for fully implicit,
+     pure Crank-Nicolson and improved Crank-Nicolson on the same grid.
+  2. Price-Delta-Gamma error hierarchy  E_V, E_Delta, E_Gamma.
+  3. Spatial mesh refinement for the Greeks, M = 50, 100, 200, 400 (fine N).
+  4. Strike alignment: K on a grid node vs K midway between two nodes.
 
-Parameters: K=100, T=1, r=0.05, sigma=0.20, Smax=400
-
-Author: Akshat Kumar
+Usage
+-----
+    python numerical_greeks.py
+    python numerical_greeks.py --M 200 --N 200
 """
 
+import argparse
+import os
+from math import log2
+
 import numpy as np
-from math import log, sqrt, exp, erf, pi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Analytical Black-Scholes functions
-# ─────────────────────────────────────────────────────────────────────────────
+from black_scholes import bs_delta, bs_delta_vec, bs_gamma, bs_gamma_vec, bs_price, bs_price_vec
+from crank_nicolson import crank_nicolson_solver
+from implicit_fdm import implicit_solver
+from parameters import FIG_DIR, add_common_args, figure_path
 
-def _N(x):
-    return 0.5 * (1.0 + erf(x / sqrt(2.0)))
+METHODS = (
+    ("Fully implicit", lambda *a: implicit_solver(*a)),
+    ("Crank-Nicolson", lambda *a: crank_nicolson_solver(*a, startup=0)),
+    ("Improved CN", lambda *a: crank_nicolson_solver(*a, startup=1)),
+)
 
-def _n(x):
-    return exp(-0.5 * x * x) / sqrt(2.0 * pi)
 
-def bs_price(S, K, T, r, sigma, opt='call'):
-    if S <= 0 or T <= 0:
-        return max(S - K, 0.0) if opt == 'call' else max(K - S, 0.0)
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    d2 = d1 - sigma * sqrt(T)
-    c  = S * _N(d1) - K * exp(-r * T) * _N(d2)
-    return c if opt == 'call' else c - S + K * exp(-r * T)
+def compute_greeks(S, V):
+    """Central-difference Delta and Gamma at the interior nodes S_1..S_{M-1}."""
+    dS = S[1] - S[0]
+    delta = (V[2:] - V[:-2]) / (2.0 * dS)
+    gamma = (V[2:] - 2.0 * V[1:-1] + V[:-2]) / dS ** 2
+    return S[1:-1], delta, gamma
 
-def bs_delta(S, K, T, r, sigma, opt='call'):
-    """Analytical Delta."""
-    if S <= 0 or T <= 0:
-        return 0.0
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    return _N(d1) if opt == 'call' else _N(d1) - 1.0
 
-def bs_gamma(S, K, T, r, sigma):
-    """Analytical Gamma (same for call and put by put-call parity)."""
-    if S <= 0 or T <= 0:
-        return 0.0
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    return _n(d1) / (S * sigma * sqrt(T))
+def _extrema(y):
+    dy = np.sign(np.diff(y))
+    dy = dy[dy != 0]
+    return int(np.sum(dy[1:] != dy[:-1]))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Thomas Algorithm
-# ─────────────────────────────────────────────────────────────────────────────
 
-def thomas(a, b, c, d):
-    n  = len(b)
-    b  = b.copy(); d = d.copy()
-    x  = np.zeros(n)
-    for i in range(1, n):
-        m     = a[i] / b[i - 1]
-        b[i] -= m * c[i - 1]
-        d[i] -= m * d[i - 1]
-    x[-1] = d[-1] / b[-1]
-    for i in range(n - 2, -1, -1):
-        x[i] = (d[i] - c[i] * x[i + 1]) / b[i]
-    return x
+def oscillation_count(S_int, gamma, K, half_width, r=None, sigma=None, T=None):
+    """Spurious local extrema of the numerical Gamma in [K - w, K + w].
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Solvers
-# ─────────────────────────────────────────────────────────────────────────────
+    Counts the local extrema of the numerical Gamma on the window and subtracts the
+    number of extrema of the analytical Gamma on the same nodes (the exact Gamma has
+    one smooth peak, located at S = K exp(-(r + 3 sigma^2/2) T)). Zero means that the
+    numerical Gamma has exactly the shape of the analytical one; any positive value is
+    a numerical oscillation."""
+    from parameters import BENCH
+    r = BENCH["r"] if r is None else r
+    sigma = BENCH["sigma"] if sigma is None else sigma
+    T = BENCH["T"] if T is None else T
+    w = (S_int >= K - half_width) & (S_int <= K + half_width)
+    exact = bs_gamma_vec(S_int[w], K, T, r, sigma)
+    return max(0, _extrema(gamma[w]) - _extrema(exact))
 
-def solve_implicit(K, T, r, sigma, Smax, M, N, opt='call'):
-    dS = Smax / M; dt = T / N
-    S  = np.linspace(0, Smax, M + 1)
-    V  = np.maximum(S - K, 0.0) if opt == 'call' else np.maximum(K - S, 0.0)
-    Sj = np.arange(1, M) * dS
-    al = 0.5*sigma**2*Sj**2/dS**2 - 0.5*r*Sj/dS
-    be = -sigma**2*Sj**2/dS**2 - r
-    ga = 0.5*sigma**2*Sj**2/dS**2 + 0.5*r*Sj/dS
-    a  = -dt*al; b = 1.0 - dt*be; c = -dt*ga
-    for step in range(N):
-        tau = (step+1)*dt
-        V0  = 0.0 if opt=='call' else K*exp(-r*tau)
-        VM  = (Smax - K*exp(-r*tau)) if opt=='call' else 0.0
-        rhs = V[1:M].copy(); rhs[0] -= a[0]*V0; rhs[-1] -= c[-1]*VM
-        V[0] = V0; V[1:M] = thomas(a,b,c,rhs); V[M] = VM
-    return S, V
 
-def solve_cn(K, T, r, sigma, Smax, M, N, opt='call'):
-    dS = Smax/M; dt = T/N
-    S  = np.linspace(0, Smax, M+1)
-    V  = np.maximum(S-K, 0.0) if opt == 'call' else np.maximum(K-S, 0.0)
-    Sj = np.arange(1,M)*dS
-    al = 0.5*sigma**2*Sj**2/dS**2 - 0.5*r*Sj/dS
-    be = -sigma**2*Sj**2/dS**2 - r
-    ga = 0.5*sigma**2*Sj**2/dS**2 + 0.5*r*Sj/dS
-    h  = 0.5*dt
-    aL=-h*al; bL=1.0-h*be; cL=-h*ga
-    aR= h*al; bR=1.0+h*be; cR= h*ga
-    for step in range(N):
-        tn=(step+1)*dt; to=step*dt
-        V0n=0.0 if opt=='call' else K*exp(-r*tn)
-        VMn=(Smax-K*exp(-r*tn)) if opt=='call' else 0.0
-        V0o=0.0 if opt=='call' else K*exp(-r*to)
-        VMo=(Smax-K*exp(-r*to)) if opt=='call' else 0.0
-        vi=V[1:M]
-        rhs=bR*vi
-        rhs[1:]  +=aR[1:]*vi[:-1]; rhs[:-1]+=cR[:-1]*vi[1:]
-        rhs[0]   +=aR[0]*V0o-aL[0]*V0n; rhs[-1]+=cR[-1]*VMo-cL[-1]*VMn
-        V[0]=V0n; V[1:M]=thomas(aL,bL,cL,rhs); V[M]=VMn
-    return S, V
+def greek_errors(S, V, K, T, r, sigma, option, window=None):
+    """Max-norm errors of price, Delta and Gamma over interior nodes (optionally a window)."""
+    Si, d, g = compute_greeks(S, V)
+    m = np.ones_like(Si, bool) if window is None else (Si >= window[0]) & (Si <= window[1])
+    eV = np.max(np.abs(V[1:-1][m] - bs_price_vec(Si[m], K, T, r, sigma, option)))
+    eD = np.max(np.abs(d[m] - bs_delta_vec(Si[m], K, T, r, sigma, option)))
+    eG = np.max(np.abs(g[m] - bs_gamma_vec(Si[m], K, T, r, sigma)))
+    return eV, eD, eG
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Numerical Greeks from FDM price surface
-# ─────────────────────────────────────────────────────────────────────────────
 
-def fdm_greeks(S, V, M):
-    """
-    Compute numerical Delta and Gamma at each interior grid node
-    using central finite differences on the price surface.
+def main():
+    p = argparse.ArgumentParser(description="Numerical Delta and Gamma")
+    add_common_args(p, M=400, N=400)
+    a = p.parse_args()
+    K, T, r, sig, Smax, M, N = a.K, a.T, a.r, a.sigma, a.Smax, a.M, a.N
+    dS = Smax / M
+    win = (K - 0.5 * K, K + 0.5 * K)                      # region of interest 0.5K <= S <= 1.5K
 
-    Delta_j = (V_{j+1} - V_{j-1}) / (2*dS)          [central, O(dS^2)]
-    Gamma_j = (V_{j+1} - 2*V_j + V_{j-1}) / dS^2    [central, O(dS^2)]
-    """
-    dS    = S[1] - S[0]
-    delta = np.zeros(M + 1)
-    gamma = np.zeros(M + 1)
-    for j in range(1, M):
-        delta[j] = (V[j + 1] - V[j - 1]) / (2.0 * dS)
-        gamma[j] = (V[j + 1] - 2.0 * V[j] + V[j - 1]) / (dS * dS)
-    # Boundary: one-sided
-    delta[0]  = (V[1] - V[0]) / dS
-    gamma[0]  = (V[2] - 2*V[1] + V[0]) / (dS*dS)
-    delta[-1] = (V[-1] - V[-2]) / dS
-    gamma[-1] = (V[-1] - 2*V[-2] + V[-3]) / (dS*dS)
-    return delta, gamma
+    print("=" * 84)
+    print("  NUMERICAL GREEKS: CENTRAL DIVIDED DIFFERENCES ON THE FD PRICE")
+    print(f"  K = {K:g}, T = {T:g}, r = {r:g}, sigma = {sig:g};  S_max = {Smax:g}, M = {M}, N = {N}, dS = {dS:g}")
+    print("=" * 84)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────────────────────────────
+    # ---- 1. Greeks at the evaluation point and selected nodes -------------------------------
+    sol = {}
+    for name, f in METHODS:
+        for opt in ("call", "put"):
+            sol[(name, opt)] = f(K, T, r, sig, Smax, M, N, opt)
+    print("\n  [1] Greeks at S = S0 (benchmark: call Delta 0.636831, put Delta -0.363169, Gamma 0.018762)")
+    print(f"  {'Method':<16} {'option':<5} {'Delta_FD':>11} {'Delta_BS':>11} {'|err|':>9}"
+          f" {'Gamma_FD':>11} {'Gamma_BS':>11} {'|err|':>9}")
+    for name, _ in METHODS:
+        for opt in ("call", "put"):
+            S, V = sol[(name, opt)]
+            Si, d, g = compute_greeks(S, V)
+            dfd, gfd = np.interp(a.S0, Si, d), np.interp(a.S0, Si, g)
+            dbs, gbs = bs_delta(a.S0, K, T, r, sig, opt), bs_gamma(a.S0, K, T, r, sig)
+            print(f"  {name:<16} {opt:<5} {dfd:>11.6f} {dbs:>11.6f} {abs(dfd - dbs):>9.2e}"
+                  f" {gfd:>11.6f} {gbs:>11.6f} {abs(gfd - gbs):>9.2e}")
 
-if __name__ == '__main__':
+    S, V = sol[("Crank-Nicolson", "call")]
+    Si, d, g = compute_greeks(S, V)
+    print("\n  Call Greeks across the strike region (Crank-Nicolson)")
+    print(f"  {'S':>7} {'Delta_BS':>10} {'Delta_FD':>10} {'err':>10}  {'Gamma_BS':>10} {'Gamma_FD':>10} {'err':>10}")
+    for s in (80, 90, 95, 100, 105, 110, 120):
+        db, gb = bs_delta(s, K, T, r, sig, "call"), bs_gamma(s, K, T, r, sig)
+        df, gf = np.interp(s, Si, d), np.interp(s, Si, g)
+        print(f"  {s:>7.1f} {db:>10.6f} {df:>10.6f} {df - db:>10.2e}  {gb:>10.6f} {gf:>10.6f} {gf - gb:>10.2e}")
 
-    K     = 100.0
-    T     = 1.0
-    r     = 0.05
-    sigma = 0.20
-    Smax  = 400.0
-    M     = 400
-    N     = 2000
-    dS    = Smax / M
+    # ---- 2. Error hierarchy ------------------------------------------------------------------
+    print(f"\n  [2] Price-Delta-Gamma error hierarchy (max-norm over {win[0]:g} <= S <= {win[1]:g})")
+    print(f"  {'Method':<16} {'option':<5} {'E_V':>10} {'E_Delta':>10} {'E_Gamma':>10}  {'spurious extrema':>16}")
+    for name, _ in METHODS:
+        for opt in ("call", "put"):
+            S, V = sol[(name, opt)]
+            eV, eD, eG = greek_errors(S, V, K, T, r, sig, opt, win)
+            Si, _, g = compute_greeks(S, V)
+            print(f"  {name:<16} {opt:<5} {eV:>10.2e} {eD:>10.2e} {eG:>10.2e}  {oscillation_count(Si, g, K, 0.2 * K, r, sig, T):>16d}")
 
-    print("=" * 72)
-    print("  NUMERICAL BLACK-SCHOLES FDM — WEEK 9")
-    print("  Numerical Delta & Gamma vs Analytical Black-Scholes Greeks")
-    print("=" * 72)
-    print(f"  Parameters: K={K}, T={T}, r={r}, sigma={sigma}")
-    print(f"  Grid: M={M} (dS={dS:.2f}), N={N} (dt={T/N:.5f})")
-    print()
+    # ---- 3. Spatial mesh refinement for the Greeks --------------------------------------------
+    N_fine = 4000
+    print(f"\n  [3] Spatial mesh refinement for the Greeks (call, N = {N_fine} fixed, max-norm over [{win[0]:g}, {win[1]:g}])")
+    refine = {}
+    for name, f in METHODS:
+        print(f"  --- {name}")
+        print(f"  {'M':>5} {'dS':>7} {'E_V':>10} {'p_V':>6} {'E_Delta':>10} {'p_D':>6} {'E_Gamma':>10} {'p_G':>6}")
+        prev = None
+        rows = []
+        for Mm in (50, 100, 200, 400):
+            S, V = f(K, T, r, sig, Smax, Mm, N_fine, "call")
+            e = greek_errors(S, V, K, T, r, sig, "call", win)
+            rows.append((Smax / Mm, *e))
+            ps = ["" if prev is None else f"{log2(prev[i] / e[i]):6.2f}" for i in range(3)]
+            print(f"  {Mm:>5} {Smax / Mm:>7.3f} {e[0]:>10.3e} {ps[0]:>6} {e[1]:>10.3e} {ps[1]:>6} {e[2]:>10.3e} {ps[2]:>6}")
+            prev = e
+        refine[name] = np.array(rows)
 
-    for opt in ['call', 'put']:
-        print("=" * 72)
-        print(f"  EUROPEAN {opt.upper()} OPTION")
-        print("=" * 72)
+    # ---- 4. Strike alignment ------------------------------------------------------------------
+    print("\n  [4] Strike alignment (Crank-Nicolson, call, N = 400): K on a node vs K midway between nodes")
+    print("      aligned: dS = K/j_K;  off-node: dS = K/(j_K - 1/2), M kept, S_max = M dS (~5K)")
+    print(f"  {'grid':<10} {'j_K':>6} {'dS':>7} {'S_max':>8} {'V(K) err':>10} {'Delta(K) err':>13}"
+          f" {'Gamma(K) err':>13} {'E_V window':>11}")
+    for jK in (10, 20, 40, 80):
+        Mm = 5 * jK
+        for label, dSa in (("aligned", K / jK), ("off-node", K / (jK - 0.5))):
+            Sm = Mm * dSa
+            S, V = crank_nicolson_solver(K, T, r, sig, Sm, Mm, 400, "call")
+            Si, d, g = compute_greeks(S, V)
+            ev = abs(np.interp(K, S, V) - bs_price(K, K, T, r, sig, "call"))
+            ed = abs(np.interp(K, Si, d) - bs_delta(K, K, T, r, sig, "call"))
+            eg = abs(np.interp(K, Si, g) - bs_gamma(K, K, T, r, sig))
+            ew = greek_errors(S, V, K, T, r, sig, "call", win)[0]
+            jk_txt = f"{jK}" if label == "aligned" else f"{jK - 0.5:g}"
+            print(f"  {label:<10} {jk_txt:>6} {dSa:>7.4f} {Sm:>8.2f} {ev:>10.2e} {ed:>13.2e} {eg:>13.2e} {ew:>11.2e}")
+    print("  (on the off-node grid the values at S = K are linearly interpolated between the two neighbouring nodes)")
 
-        S_im, V_im = solve_implicit(K, T, r, sigma, Smax, M, N, opt)
-        S_cn, V_cn = solve_cn     (K, T, r, sigma, Smax, M, N, opt)
+    if a.no_plot:
+        return
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    os.makedirs(FIG_DIR, exist_ok=True)
+    tag = f"K={K:g}, T={T:g}, r={r:g}, sigma={sig:g}; S_max={Smax:g}, M={M}, N={N}"
 
-        delta_im, gamma_im = fdm_greeks(S_im, V_im, M)
-        delta_cn, gamma_cn = fdm_greeks(S_cn, V_cn, M)
+    # Figure 5: analytical vs numerical Delta and Gamma (full range + errors)
+    S, V = sol[("Crank-Nicolson", "call")]
+    Si, d, g = compute_greeks(S, V)
+    Sp, Vp = sol[("Crank-Nicolson", "put")]
+    _, dp, _ = compute_greeks(Sp, Vp)
+    m = Si <= 2.5 * K
+    fig, ax = plt.subplots(2, 2, figsize=(11, 7))
+    ax[0, 0].plot(Si[m], bs_delta_vec(Si[m], K, T, r, sig, "call"), lw=3, alpha=0.35, color="C0", label="call, analytical")
+    ax[0, 0].plot(Si[m], d[m], "--", color="C0", lw=1.2, label="call, CN")
+    ax[0, 0].plot(Si[m], bs_delta_vec(Si[m], K, T, r, sig, "put"), lw=3, alpha=0.35, color="C3", label="put, analytical")
+    ax[0, 0].plot(Si[m], dp[m], "--", color="C3", lw=1.2, label="put, CN")
+    ax[0, 0].set(title="Delta", xlabel="S")
+    ax[0, 1].plot(Si[m], d[m] - bs_delta_vec(Si[m], K, T, r, sig, "call"), color="C0")
+    ax[0, 1].set(title="Delta error (call = put)", xlabel="S", ylabel=r"$\Delta_{FD}-\Delta_{BS}$")
+    ax[1, 0].plot(Si[m], bs_gamma_vec(Si[m], K, T, r, sig), lw=3, alpha=0.35, color="C2", label="analytical")
+    ax[1, 0].plot(Si[m], g[m], "--", color="k", lw=1.0, label="CN")
+    ax[1, 0].set(title="Gamma (calls and puts)", xlabel="S")
+    z = (Si >= K - 15) & (Si <= K + 15)
+    ax[1, 1].plot(Si[z], bs_gamma_vec(Si[z], K, T, r, sig), lw=3, alpha=0.35, color="C2", label="analytical")
+    for name, mk in (("Fully implicit", "s"), ("Crank-Nicolson", "o"), ("Improved CN", "^")):
+        S2, V2 = sol[(name, "call")]
+        Si2, _, g2 = compute_greeks(S2, V2)
+        ax[1, 1].plot(Si2[z], g2[z], mk, ms=3, label=name)
+    ax[1, 1].set(title="Gamma near the strike (magnified)", xlabel="S")
+    for x in ax.flat:
+        x.axvline(K, color="gray", ls=":", lw=0.8); x.grid(alpha=0.3)
+        if x.get_legend_handles_labels()[0]:
+            x.legend(fontsize=7)
+    fig.suptitle(tag, fontsize=10); fig.tight_layout()
+    out = figure_path("fig07_numerical_greeks.png", a.custom); fig.savefig(out, dpi=130); plt.close(fig)
+    print(f"\n  Figure saved: {os.path.relpath(out)}")
 
-        display_S = [60, 70, 80, 90, 95, 100, 105, 110, 120, 140, 160, 200]
+    # Figure 6: Greek error vs dS (log-log)
+    fig, ax = plt.subplots(1, 3, figsize=(13, 3.8))
+    for k, ttl in enumerate(("price", "Delta", "Gamma")):
+        for name, mk in (("Fully implicit", "s-"), ("Crank-Nicolson", "o-"), ("Improved CN", "^--")):
+            R = refine[name]
+            ax[k].loglog(R[:, 0], R[:, k + 1], mk, ms=4, label=name)
+        h = refine["Crank-Nicolson"][:, 0]
+        ax[k].loglog(h, refine["Crank-Nicolson"][0, k + 1] * (h / h[0]) ** 2, "k:", label="slope 2")
+        ax[k].set(title=f"{ttl} error, max over [{win[0]:g},{win[1]:g}]", xlabel="dS")
+        ax[k].grid(alpha=0.3, which="both"); ax[k].legend(fontsize=7)
+    fig.suptitle(f"Spatial refinement of Greeks, M = 50..400, N = {N_fine}; S_max={Smax:g}", fontsize=10)
+    fig.tight_layout()
+    out = figure_path("fig08_greek_convergence.png", a.custom); fig.savefig(out, dpi=130); plt.close(fig)
+    print(f"  Figure saved: {os.path.relpath(out)}")
 
-        # Delta table
-        print(f"\n  DELTA (Delta = dV/dS)  —  central finite difference on FDM grid")
-        print(f"  {'S':>6}  {'Delta Analytical':>18}  {'Delta Implicit':>14}  {'Err (Impl)':>12}  {'Delta CN':>12}  {'Err (CN)':>12}")
-        print("  " + "-" * 82)
-        for S_req in display_S:
-            j     = min(M-1, max(1, round(S_req / dS)))
-            s_act = S_im[j]
-            da    = bs_delta(s_act, K, T, r, sigma, opt)
-            d_im  = delta_im[j]
-            d_cn  = delta_cn[j]
-            print(f"  {s_act:>6.1f}  {da:>18.8f}  {d_im:>14.8f}  {abs(d_im-da):>12.4e}  {d_cn:>12.8f}  {abs(d_cn-da):>12.4e}")
 
-        # Gamma table
-        print(f"\n  GAMMA (Gamma = d2V/dS2)  —  second-order FD on FDM grid")
-        print(f"  {'S':>6}  {'Gamma Analytical':>18}  {'Gamma Implicit':>14}  {'Err (Impl)':>12}  {'Gamma CN':>12}  {'Err (CN)':>12}")
-        print("  " + "-" * 82)
-        for S_req in display_S:
-            j     = min(M-1, max(1, round(S_req / dS)))
-            s_act = S_im[j]
-            ga    = bs_gamma(s_act, K, T, r, sigma)
-            g_im  = gamma_im[j]
-            g_cn  = gamma_cn[j]
-            print(f"  {s_act:>6.1f}  {ga:>18.8f}  {g_im:>14.8f}  {abs(g_im-ga):>12.4e}  {g_cn:>12.8f}  {abs(g_cn-ga):>12.4e}")
-
-        # Near-strike table at T=1
-        print(f"\n  NEAR-STRIKE ACCURACY at T=1 (S = K+-3 nodes, dS={dS:.1f})")
-        near_S = [K - 3*dS, K - 2*dS, K - dS, K, K + dS, K + 2*dS, K + 3*dS]
-        print(f"  {'S':>7}  {'Delta Exact':>12}  {'|Err Impl|':>12}  {'|Err CN|':>12}  {'Gamma Exact':>12}  {'|Err Impl|':>12}  {'|Err CN|':>12}")
-        print("  " + "-" * 95)
-        for s_req in near_S:
-            j     = min(M-1, max(1, round(s_req / dS)))
-            s_act = S_im[j]
-            da    = bs_delta(s_act, K, T, r, sigma, opt)
-            ga    = bs_gamma(s_act, K, T, r, sigma)
-            d_im  = delta_im[j];  d_cn  = delta_cn[j]
-            g_im  = gamma_im[j];  g_cn  = gamma_cn[j]
-            print(f"  {s_act:>7.1f}  {da:>12.8f}  {abs(d_im-da):>12.4e}  {abs(d_cn-da):>12.4e}  {ga:>12.8f}  {abs(g_im-ga):>12.4e}  {abs(g_cn-ga):>12.4e}")
-
-    # ─── SECTION 2: Short maturity T=0.1 near-strike ───────────────────────
-    print()
-    print("=" * 72)
-    print("  SHORT MATURITY T=0.1 — NEAR-STRIKE GREEKS")
-    print("  At T=0.1 the kink remains concentrated near K; Gamma maximum is not exactly at K.")
-    print("=" * 72)
-
-    T_short = 0.1
-    M_sh    = 400
-    N_sh    = 2000
-    dS_sh   = Smax / M_sh
-
-    S_sh_im, V_sh_im = solve_implicit(K, T_short, r, sigma, Smax, M_sh, N_sh, 'call')
-    S_sh_cn, V_sh_cn = solve_cn(K, T_short, r, sigma, Smax, M_sh, N_sh, 'call')
-    del_sh_im, gam_sh_im = fdm_greeks(S_sh_im, V_sh_im, M_sh)
-    del_sh_cn, gam_sh_cn = fdm_greeks(S_sh_cn, V_sh_cn, M_sh)
-
-    print(f"\n  T={T_short}, M={M_sh} (dS={dS_sh:.2f}), N={N_sh}")
-    print(f"  Analytical ATM Gamma at S=K: {bs_gamma(K, K, T_short, r, sigma):.6f}")
-    print(f"\n  {'S':>7}  {'Delta Exact':>12}  {'|Err Impl|':>12}  {'|Err CN|':>12}  {'Gamma Exact':>13}  {'|Err Impl|':>12}  {'|Err CN|':>12}")
-    print("  " + "-" * 97)
-    near_S_sh = [K - 3*dS_sh, K - 2*dS_sh, K - dS_sh, K, K + dS_sh, K + 2*dS_sh, K + 3*dS_sh]
-    for s_req in near_S_sh:
-        j     = min(M_sh-1, max(1, round(s_req / dS_sh)))
-        s_act = S_sh_im[j]
-        da    = bs_delta(s_act, K, T_short, r, sigma, 'call')
-        ga    = bs_gamma(s_act, K, T_short, r, sigma)
-        d_im  = del_sh_im[j];  d_cn  = del_sh_cn[j]
-        g_im  = gam_sh_im[j];  g_cn  = gam_sh_cn[j]
-        print(f"  {s_act:>7.1f}  {da:>12.8f}  {abs(d_im-da):>12.4e}  {abs(d_cn-da):>12.4e}  {ga:>13.8f}  {abs(g_im-ga):>12.4e}  {abs(g_cn-ga):>12.4e}")
-
-    print("""
-  At T=0.1 the analytical Gamma at S=K is much larger than at T=1; this is ATM Gamma, not the global maximum.
-  Near-strike Greek errors are correspondingly larger, since the numerical
-  second derivative must resolve a sharper feature with the same spatial grid.
-  This confirms that short-dated option Greeks require finer spatial grids
-  or non-uniform grids with clustering around K.
-  """)
-
-    # ─── SECTION 3: Delta/Gamma mesh-refinement study ──────────────────────
-    print("=" * 72)
-    print("  SECTION 3 — DELTA/GAMMA MESH-REFINEMENT STUDY")
-    print("  Fixed N=2000, vary M in {50,100,200,400}.")
-    print("  Errors measured at S=K (ATM node or nearest). Expected: O(dS^2).")
-    print("=" * 72)
-
-    M_ref_vals = [50, 100, 200, 400]
-    N_ref_fix  = 2000
-    opt_ref    = 'call'
-
-    for solver_name, solver in [("Fully Implicit", solve_implicit),
-                                  ("Crank-Nicolson", solve_cn)]:
-        print(f"\n  --- {solver_name} (N={N_ref_fix}, T=1) ---")
-        print(f"  {'M':>6}  {'dS':>8}  {'Delta Err ATM':>15}  {'Ratio':>8}  {'Gamma Err ATM':>15}  {'Ratio':>8}")
-        print("  " + "-" * 72)
-        prev_de, prev_ge = None, None
-        for M_r in M_ref_vals:
-            dS_r = Smax / M_r
-            S_r, V_r = solver(K, T, r, sigma, Smax, M_r, N_ref_fix, opt_ref)
-            del_r, gam_r = fdm_greeks(S_r, V_r, M_r)
-            j_K  = min(M_r-1, max(1, round(K / dS_r)))
-            s_K  = S_r[j_K]
-            da   = bs_delta(s_K, K, T, r, sigma, opt_ref)
-            ga   = bs_gamma(s_K, K, T, r, sigma)
-            d_e  = abs(del_r[j_K] - da)
-            g_e  = abs(gam_r[j_K] - ga)
-            r_d  = prev_de / d_e if prev_de and d_e > 0 else float('nan')
-            r_g  = prev_ge / g_e if prev_ge and g_e > 0 else float('nan')
-            print(f"  {M_r:>6}  {dS_r:>8.2f}  {d_e:>15.5e}  {r_d:>8.2f}  {g_e:>15.5e}  {r_g:>8.2f}")
-            prev_de, prev_ge = d_e, g_e
-        print()
-
-    print("""
-  Interpretation:
-    The observed ratios are reported individually. M=50 is unaligned; for the
-    implicit Gamma errors the M=50->100 ratio is below one, while later ratios
-    approach but do not uniformly equal four. The CN Delta and Gamma ratios
-    from M=100 onward are near four. Do not infer second order for every pair.
-  """)
-
-    print("=" * 72)
-    print("  NUMERICAL GREEKS STUDY COMPLETE")
-    print("=" * 72)
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,30 @@
+========================================================================
+  FULLY IMPLICIT (BACKWARD EULER) FINITE-DIFFERENCE SOLVER
+  K = 100, T = 1, r = 0.05, sigma = 0.2
+  S_max = 500, M = 400, N = 400, dS = 1.25, dtau = 0.0025
+========================================================================
+
+  CALL:  V_FD(S=100) = 10.444095   V_BS = 10.450584   |error| = 6.488e-03
+         ||e||_inf = 6.488e-03    ||e||_2 = 3.296e-02
+
+  PUT:  V_FD(S=100) = 5.567335   V_BS = 5.573526   |error| = 6.191e-03
+         ||e||_inf = 6.191e-03    ||e||_2 = 3.136e-02
+
+  Price verification table
+        S        C_BS       C_Imp      |err|          P_BS       P_Imp      |err|
+     60.0    0.054437    0.055844   1.41e-03     35.177379   35.179083   1.70e-03
+     80.0    1.859420    1.859127   2.93e-04     16.982362   16.982366   4.43e-06
+     90.0    5.091222    5.086629   4.59e-03     10.214165   10.209869   4.30e-03
+    100.0   10.450584   10.444095   6.49e-03      5.573526    5.567335   6.19e-03
+    110.0   17.662954   17.657732   5.22e-03      2.785896    2.780972   4.92e-03
+    120.0   26.169044   26.166226   2.82e-03      1.291986    1.289466   2.52e-03
+    140.0   45.110610   45.110524   8.55e-05      0.233552    0.233764   2.12e-04
+
+  Qualitative checks
+    call positivity  min V_j            =  0.000e+00
+    call monotone    min (V_j+1 - V_j)  =  1.537e-36
+    call bounds      max(lb - V, V - S) =  2.967e-04  (<= 0 up to the O(dtau) discounting error)
+    put-call parity  max|C - P - (S - K e^-rT)| = 2.98e-04  (backward Euler discounts K by (1 + r dtau)^-N, not e^-rT)
+    first step: max|V_Thomas - V_numpy| = 2.84e-13
+
+  Figure saved: ../figures/fig03_implicit_price_and_error.png

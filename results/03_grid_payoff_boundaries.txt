@@ -1,0 +1,34 @@
+==================================================================
+  GRID, PAYOFF AND BOUNDARY-CONDITION CHECKS
+  K = 100, T = 1, r = 0.05, S_max = 500, M = 10, N = 4
+==================================================================
+  S-grid  : 11 nodes, dS = 50
+           [  0.  50. 100. 150. 200. 250. 300. 350. 400. 450. 500.]
+  tau-grid: 5 levels, dtau = 0.25
+           [0.   0.25 0.5  0.75 1.  ]
+
+  Check                                          Result
+  ------------------------------------------------------------
+  S[0] == 0                                      PASS
+  S[M] == S_max                                  PASS
+  uniform dS                                     PASS
+  tau[0] == 0 (payoff level)                     PASS
+  tau[N] == T (valuation level)                  PASS
+  uniform dtau                                   PASS
+  call payoff >= 0                               PASS
+  put payoff >= 0                                PASS
+  call payoff - put payoff == S - K              PASS
+  call: boundary data at tau=0 equal payoff      PASS
+  put: boundary data at tau=0 equal payoff       PASS
+  boundary data satisfy put-call parity          PASS
+  strike on grid (j_K = 2)                       PASS
+
+  Boundary values V(0,tau), V(S_max,tau):
+       tau    call V0      call VM       put V0   put VM
+    0.0000     0.0000     400.0000     100.0000   0.0000
+    0.2500     0.0000     401.2422      98.7578   0.0000
+    0.5000     0.0000     402.4690      97.5310   0.0000
+    0.7500     0.0000     403.6806      96.3194   0.0000
+    1.0000     0.0000     404.8771      95.1229   0.0000
+
+  Figure saved: ../figures/fig02_payoffs.png
