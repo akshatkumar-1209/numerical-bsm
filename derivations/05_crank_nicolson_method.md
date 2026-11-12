@@ -28,27 +28,31 @@ $$
 does this without introducing an unknown half level. This is the θ-scheme (2.13) with $\theta = \tfrac12$:
 
 $$
-\frac{V_j^{n+1} - V_j^n}{\Delta\tau} = \frac12\left(\mathcal{L}_h V_j^{n+1} + \mathcal{L}_h V_j^n\right). \tag{5.1}
+\frac{V_j^{n+1} - V_j^n}{\Delta\tau} = \frac12\left(\mathcal{L}_h V_j^{n+1} + \mathcal{L}_h V_j^n\right). \qquad\qquad (5.1)
 $$
 
 **Expansion.** Insert (2.8):
 
 $$
-V_j^{n+1} - V_j^n = \frac{\Delta\tau}{2}\Big[\alpha_j\left(V_{j-1}^{n+1} + V_{j-1}^n\right) + \beta_j\left(V_j^{n+1} + V_j^n\right) + \gamma_j\left(V_{j+1}^{n+1} + V_{j+1}^n\right)\Big]. \tag{5.2}
+V_j^{n+1} - V_j^n = \frac{\Delta\tau}{2}\Big[\alpha_j\left(V_{j-1}^{n+1} + V_{j-1}^n\right) + \beta_j\left(V_j^{n+1} + V_j^n\right) + \gamma_j\left(V_{j+1}^{n+1} + V_{j+1}^n\right)\Big]. \qquad\qquad (5.2)
 $$
 
 **Separation of levels.** Unknowns $(n+1)$ to the left, known values $(n)$ to the right:
 
 $$
--\frac{\Delta\tau}{2}\alpha_j V_{j-1}^{n+1} + \left(1 - \frac{\Delta\tau}{2}\beta_j\right)V_j^{n+1} - \frac{\Delta\tau}{2}\gamma_j V_{j+1}^{n+1}
-= \frac{\Delta\tau}{2}\alpha_j V_{j-1}^{n} + \left(1 + \frac{\Delta\tau}{2}\beta_j\right)V_j^{n} + \frac{\Delta\tau}{2}\gamma_j V_{j+1}^{n}. \tag{5.3}
+\begin{aligned}
+&-\frac{\Delta\tau}{2}\alpha_j V_{j-1}^{n+1} + \left(1 - \frac{\Delta\tau}{2}\beta_j\right)V_j^{n+1} - \frac{\Delta\tau}{2}\gamma_j V_{j+1}^{n+1} \\
+&\qquad = \frac{\Delta\tau}{2}\alpha_j V_{j-1}^{n} + \left(1 + \frac{\Delta\tau}{2}\beta_j\right)V_j^{n} + \frac{\Delta\tau}{2}\gamma_j V_{j+1}^{n}.
+\end{aligned} \qquad\qquad (5.3)
 $$
 
 Define the coefficients of the two tridiagonal matrices
 
 $$
-a_j^{A} = -\tfrac{\Delta\tau}{2}\alpha_j,\quad b_j^{A} = 1 - \tfrac{\Delta\tau}{2}\beta_j,\quad c_j^{A} = -\tfrac{\Delta\tau}{2}\gamma_j; \qquad
-a_j^{B} = \tfrac{\Delta\tau}{2}\alpha_j,\quad b_j^{B} = 1 + \tfrac{\Delta\tau}{2}\beta_j,\quad c_j^{B} = \tfrac{\Delta\tau}{2}\gamma_j. \tag{5.4}
+\begin{aligned}
+&a_j^{A} = -\tfrac{\Delta\tau}{2}\alpha_j,\quad b_j^{A} = 1 - \tfrac{\Delta\tau}{2}\beta_j,\quad c_j^{A} = -\tfrac{\Delta\tau}{2}\gamma_j; \\
+&a_j^{B} = \tfrac{\Delta\tau}{2}\alpha_j,\quad b_j^{B} = 1 + \tfrac{\Delta\tau}{2}\beta_j,\quad c_j^{B} = \tfrac{\Delta\tau}{2}\gamma_j.
+\end{aligned} \qquad\qquad (5.4)
 $$
 
 Note $A = I - \tfrac{\Delta\tau}{2}L_h$ and $B = I + \tfrac{\Delta\tau}{2}L_h$.
@@ -60,11 +64,11 @@ Note $A = I - \tfrac{\Delta\tau}{2}L_h$ and $B = I + \tfrac{\Delta\tau}{2}L_h$.
 Equation (5.3) for $j=1$ contains $V_0$ at **both** levels, and for $j = M-1$ it contains $V_M$ at both levels. With $\mathbf{d} = B\,\mathbf{V}^n$ computed from the interior values, the known boundary terms are added as
 
 $$
-d_1 \;\mathrel{+}=\; a_1^{B}\,g_0^{n} - a_1^{A}\,g_0^{n+1} \;=\; \tfrac{\Delta\tau}{2}\alpha_1\left(g_0^n + g_0^{n+1}\right), \tag{5.5}
+d_1 \;\mathrel{+}=\; a_1^{B}\,g_0^{n} - a_1^{A}\,g_0^{n+1} \;=\; \tfrac{\Delta\tau}{2}\alpha_1\left(g_0^n + g_0^{n+1}\right), \qquad\qquad (5.5)
 $$
 
 $$
-d_{M-1} \;\mathrel{+}=\; c_{M-1}^{B}\,g_M^{n} - c_{M-1}^{A}\,g_M^{n+1} \;=\; \tfrac{\Delta\tau}{2}\gamma_{M-1}\left(g_M^n + g_M^{n+1}\right). \tag{5.6}
+d_{M-1} \;\mathrel{+}=\; c_{M-1}^{B}\,g_M^{n} - c_{M-1}^{A}\,g_M^{n+1} \;=\; \tfrac{\Delta\tau}{2}\gamma_{M-1}\left(g_M^n + g_M^{n+1}\right). \qquad\qquad (5.6)
 $$
 
 The signs follow directly from (5.3): the right-hand boundary term $+\tfrac{\Delta\tau}{2}\alpha_1 g_0^n$ stays, and the left-hand term $-\tfrac{\Delta\tau}{2}\alpha_1 g_0^{n+1}$ changes sign when moved to the right. The boundary data enter as the **average of the two levels**, exactly as the interior values do.
@@ -75,7 +79,7 @@ The signs follow directly from (5.3): the right-hand boundary term $+\tfrac{\Del
 
 $$
 A\,\mathbf{V}^{n+1} = B\,\mathbf{V}^{n} + \mathbf{g}^{n,n+1}, \qquad
-\mathbf{g}^{n,n+1} = \tfrac{\Delta\tau}{2}\left(\alpha_1(g_0^n + g_0^{n+1}),\,0,\,\dots,\,0,\,\gamma_{M-1}(g_M^n + g_M^{n+1})\right)^{\mathsf T}. \tag{5.7}
+\mathbf{g}^{n,n+1} = \tfrac{\Delta\tau}{2}\left(\alpha_1(g_0^n + g_0^{n+1}),\,0,\,\dots,\,0,\,\gamma_{M-1}(g_M^n + g_M^{n+1})\right)^{\mathsf T}. \qquad\qquad (5.7)
 $$
 
 ```
@@ -96,7 +100,7 @@ Each step costs one tridiagonal multiply and one Thomas solve, i.e. the same $O(
 Insert the exact solution into (5.1) and expand about $\tau_{n+1/2}$. By (1.8), the time quotient equals $V_\tau(\tau_{n+1/2}) + \tfrac{\Delta\tau^2}{24}V_{\tau\tau\tau}$; the trapezoidal average equals $\mathcal{L}_h V(\tau_{n+1/2}) + \tfrac{\Delta\tau^2}{8}\mathcal{L}_h V_{\tau\tau}$. The $O(\Delta\tau)$ terms cancel by symmetry and
 
 $$
-\mathcal{T}_{\text{CN}} = O(\Delta\tau^2) + O(\Delta S^2). \tag{5.8}
+\mathcal{T}_{\text{CN}} = O(\Delta\tau^2) + O(\Delta S^2). \qquad\qquad (5.8)
 $$
 
 Both spatial and temporal errors are now second order, so refining $\Delta S$ and $\Delta\tau$ together by a factor 2 should reduce the error by a factor 4 (observed in Part 6).
@@ -108,7 +112,7 @@ Both spatial and temporal errors are now second order, so refining $\Delta S$ an
 For an eigenmode of $L_h$ with eigenvalue $\mu \le 0$ and $z = \Delta\tau\,\mu$, (5.1) multiplies the mode by
 
 $$
-G_{\text{CN}}(z) = \frac{1 + z/2}{1 - z/2}, \qquad \lvert G_{\text{CN}}(z)\rvert \le 1 \ \text{ for all } z \le 0. \tag{5.9}
+G_{\text{CN}}(z) = \frac{1 + z/2}{1 - z/2}, \qquad \lvert G_{\text{CN}}(z)\rvert \le 1 \ \text{ for all } z \le 0. \qquad\qquad (5.9)
 $$
 
 Crank–Nicolson is therefore **unconditionally stable** (A-stable). It is the (1,1) Padé approximation of $e^{z}$, which explains its second-order accuracy.
@@ -116,7 +120,7 @@ Crank–Nicolson is therefore **unconditionally stable** (A-stable). It is the (
 However,
 
 $$
-\lim_{z\to-\infty} G_{\text{CN}}(z) = -1, \tag{5.10}
+\lim_{z\to-\infty} G_{\text{CN}}(z) = -1, \qquad\qquad (5.10)
 $$
 
 so CN is **not L-stable**: very stiff modes (large $\lvert\mu\rvert\Delta\tau$) are hardly damped and change sign at every step. Smooth data contain almost no such modes and CN is excellent. The kinked payoff, however, excites them at $S = K$, which can produce persistent oscillations that are invisible in the price but obvious in Gamma. This limitation is analysed and cured in Part 8:

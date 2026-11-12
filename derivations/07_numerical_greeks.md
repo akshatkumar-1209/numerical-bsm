@@ -22,7 +22,7 @@ are needed as well. When no closed form exists they must be extracted from the f
 Let $\tau$ be the time to maturity and $d_{1,2}$ as in (2.6). Two facts are needed:
 
 $$
-\frac{\partial d_1}{\partial S} = \frac{\partial d_2}{\partial S} = \frac{1}{S\sigma\sqrt\tau}, \qquad S\,\phi(d_1) = K e^{-r\tau}\phi(d_2). \tag{7.1}
+\frac{\partial d_1}{\partial S} = \frac{\partial d_2}{\partial S} = \frac{1}{S\sigma\sqrt\tau}, \qquad S\,\phi(d_1) = K e^{-r\tau}\phi(d_2). \qquad\qquad (7.1)
 $$
 
 The second identity follows from $d_1^2 - d_2^2 = (d_1 - d_2)(d_1 + d_2) = \sigma\sqrt\tau\,(d_1+d_2) = 2\ln(S/K) + 2r\tau$, so $\phi(d_2)/\phi(d_1) = e^{(d_1^2-d_2^2)/2} = (S/K)e^{r\tau}$.
@@ -34,7 +34,7 @@ $$
 $$
 
 $$
-\Delta_C = \Phi(d_1), \qquad \Delta_P = \Phi(d_1) - 1, \qquad \Gamma = \frac{\partial \Phi(d_1)}{\partial S} = \frac{\phi(d_1)}{S\sigma\sqrt\tau}. \tag{7.2}
+\Delta_C = \Phi(d_1), \qquad \Delta_P = \Phi(d_1) - 1, \qquad \Gamma = \frac{\partial \Phi(d_1)}{\partial S} = \frac{\phi(d_1)}{S\sigma\sqrt\tau}. \qquad\qquad (7.2)
 $$
 
 $\Delta_P$ follows from put–call parity $C - P = S - Ke^{-r\tau}$; differentiating parity twice shows that **Gamma is the same for calls and puts**. Benchmark ($S = K = 100$, $\tau = 1$): $\Delta_C = 0.636831$, $\Delta_P = -0.363169$, $\Gamma = 0.018762$.
@@ -49,14 +49,14 @@ Apply the central stencils of Part 1 to the computed price at the final level $n
 
 $$
 \Delta_j^{FD} = \frac{V_{j+1} - V_{j-1}}{2\Delta S}, \qquad
-\Gamma_j^{FD} = \frac{V_{j+1} - 2V_j + V_{j-1}}{(\Delta S)^2}. \tag{7.3}
+\Gamma_j^{FD} = \frac{V_{j+1} - 2V_j + V_{j-1}}{(\Delta S)^2}. \qquad\qquad (7.3)
 $$
 
 By (1.5) and (1.6), if the $V_j$ were *exact*, the errors would be
 
 $$
 \Delta_j^{FD} - \Delta(S_j) = \frac{(\Delta S)^2}{6}V_{SSS} + O(\Delta S^4), \qquad
-\Gamma_j^{FD} - \Gamma(S_j) = \frac{(\Delta S)^2}{12}V_{SSSS} + O(\Delta S^4). \tag{7.4}
+\Gamma_j^{FD} - \Gamma(S_j) = \frac{(\Delta S)^2}{12}V_{SSSS} + O(\Delta S^4). \qquad\qquad (7.4)
 $$
 
 `finite_difference_derivatives.py` confirms this second-order stencil error on the analytical call price (e.g. $\Delta S = 1$: $8.6\times10^{-5}$ for Delta, $2.3\times10^{-6}$ for Gamma).
@@ -69,7 +69,7 @@ The computed values are not exact: $V_j = V(S_j) + e_j$ with $e_j$ the pricing e
 
 $$
 \Delta_j^{FD} = \underbrace{D_0 V(S_j)}_{\text{(7.4)}} + \frac{e_{j+1} - e_{j-1}}{2\Delta S}, \qquad
-\Gamma_j^{FD} = \underbrace{D_+D_- V(S_j)}_{\text{(7.4)}} + \frac{e_{j+1} - 2e_j + e_{j-1}}{(\Delta S)^2}. \tag{7.5}
+\Gamma_j^{FD} = \underbrace{D_+D_- V(S_j)}_{\text{(7.4)}} + \frac{e_{j+1} - 2e_j + e_{j-1}}{(\Delta S)^2}. \qquad\qquad (7.5)
 $$
 
 Two cases must be distinguished.
@@ -79,7 +79,7 @@ Two cases must be distinguished.
 **(b) Oscillatory pricing error.** If $\lvert e_j\rvert \le \varepsilon$ but the sign alternates from node to node, the worst cases are
 
 $$
-\big\lvert D_0 e_j\big\rvert \le \frac{\varepsilon}{\Delta S}, \qquad \big\lvert D_+D_- e_j\big\rvert \le \frac{4\varepsilon}{(\Delta S)^2}. \tag{7.6}
+\big\lvert D_0 e_j\big\rvert \le \frac{\varepsilon}{\Delta S}, \qquad \big\lvert D_+D_- e_j\big\rvert \le \frac{4\varepsilon}{(\Delta S)^2}. \qquad\qquad (7.6)
 $$
 
 The price error is *divided* by $\Delta S$ for Delta and by $(\Delta S)^2$ for Gamma, so **refining $\Delta S$ makes things worse** unless $\varepsilon$ falls faster than $(\Delta S)^2$. A price that is accurate to $10^{-4}$ can carry a meaningless Gamma. Part 8 shows that pure Crank–Nicolson produces exactly this kind of alternating error near the strike when $\Delta\tau$ is large relative to $\Delta S^2$.

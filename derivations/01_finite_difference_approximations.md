@@ -40,11 +40,11 @@ This part derives the answers from Taylor's theorem and defines the grid used th
 Taylor's theorem with Lagrange remainder gives, for some $\xi_\pm$ between $x$ and $x \pm h$,
 
 $$
-f(x+h) = f(x) + h f'(x) + \frac{h^2}{2} f''(x) + \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_+), \tag{1.1}
+f(x+h) = f(x) + h f'(x) + \frac{h^2}{2} f''(x) + \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_+), \qquad\qquad (1.1)
 $$
 
 $$
-f(x-h) = f(x) - h f'(x) + \frac{h^2}{2} f''(x) - \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_-). \tag{1.2}
+f(x-h) = f(x) - h f'(x) + \frac{h^2}{2} f''(x) - \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(\xi_-). \qquad\qquad (1.2)
 $$
 
 Every formula below is obtained by combining (1.1) and (1.2) so that the unwanted derivatives cancel.
@@ -56,13 +56,13 @@ Every formula below is obtained by combining (1.1) and (1.2) so that the unwante
 **Forward difference.** Truncate (1.1) after the $h^2$ term and solve for $f'(x)$:
 
 $$
-D_+ f(x) \equiv \frac{f(x+h) - f(x)}{h} = f'(x) + \frac{h}{2} f''(\xi_+). \tag{1.3}
+D_+ f(x) \equiv \frac{f(x+h) - f(x)}{h} = f'(x) + \frac{h}{2} f''(\xi_+). \qquad\qquad (1.3)
 $$
 
 **Backward difference.** The same with (1.2):
 
 $$
-D_- f(x) \equiv \frac{f(x) - f(x-h)}{h} = f'(x) - \frac{h}{2} f''(\xi_-). \tag{1.4}
+D_- f(x) \equiv \frac{f(x) - f(x-h)}{h} = f'(x) - \frac{h}{2} f''(\xi_-). \qquad\qquad (1.4)
 $$
 
 Both errors are proportional to $h$: the one-sided formulas are **first-order accurate**, $O(h)$.
@@ -76,7 +76,7 @@ $$
 Dividing by $2h$:
 
 $$
-D_0 f(x) \equiv \frac{f(x+h) - f(x-h)}{2h} = f'(x) + \frac{h^2}{6} f'''(x) + O(h^4). \tag{1.5}
+D_0 f(x) \equiv \frac{f(x+h) - f(x-h)}{2h} = f'(x) + \frac{h^2}{6} f'''(x) + O(h^4). \qquad\qquad (1.5)
 $$
 
 The symmetric arrangement removes the $O(h)$ term, so the central difference is **second-order accurate**, $O(h^2)$.
@@ -94,7 +94,7 @@ $$
 Subtracting $2f(x)$ and dividing by $h^2$:
 
 $$
-D_+D_- f(x) \equiv \frac{f(x+h) - 2f(x) + f(x-h)}{h^2} = f''(x) + \frac{h^2}{12} f^{(4)}(\xi). \tag{1.6}
+D_+D_- f(x) \equiv \frac{f(x+h) - 2f(x) + f(x-h)}{h^2} = f''(x) + \frac{h^2}{12} f^{(4)}(\xi). \qquad\qquad (1.6)
 $$
 
 The name $D_+D_-$ is exact: applying the forward difference to the backward difference gives the same three-point formula. The approximation is **second-order accurate**.
@@ -106,13 +106,13 @@ The name $D_+D_-$ is exact: applying the forward difference to the backward diff
 In time only the solution at the current level is known, so the derivative is approximated by a one-sided difference over one time step $\Delta\tau$. From (1.1) with $h = \Delta\tau$:
 
 $$
-\frac{\partial V}{\partial \tau}(S,\tau) = \frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} - \frac{\Delta\tau}{2} \frac{\partial^2 V}{\partial \tau^2}(S,\tau) + O(\Delta\tau^2). \tag{1.7}
+\frac{\partial V}{\partial \tau}(S,\tau) = \frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} - \frac{\Delta\tau}{2} \frac{\partial^2 V}{\partial \tau^2}(S,\tau) + O(\Delta\tau^2). \qquad\qquad (1.7)
 $$
 
 If this quotient is regarded as an approximation at the *end* of the interval, $\tau+\Delta\tau$, it is still $O(\Delta\tau)$ (fully implicit method, Part 4). If it is regarded as an approximation at the *midpoint* $\tau + \Delta\tau/2$, expansion about the midpoint makes the first-order term vanish by symmetry and the error becomes $O(\Delta\tau^2)$ (Crank–Nicolson method, Part 5):
 
 $$
-\frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} = \frac{\partial V}{\partial \tau}\Big(S,\tau+\tfrac{\Delta\tau}{2}\Big) + \frac{\Delta\tau^2}{24} \frac{\partial^3 V}{\partial \tau^3} + O(\Delta\tau^4). \tag{1.8}
+\frac{V(S,\tau+\Delta\tau) - V(S,\tau)}{\Delta\tau} = \frac{\partial V}{\partial \tau}\Big(S,\tau+\tfrac{\Delta\tau}{2}\Big) + \frac{\Delta\tau^2}{24} \frac{\partial^3 V}{\partial \tau^3} + O(\Delta\tau^4). \qquad\qquad (1.8)
 $$
 
 ---
@@ -122,11 +122,11 @@ $$
 The Black–Scholes problem is solved on the truncated domain $0 \le S \le S_{\max}$, $0 \le \tau \le T$ (the reason for the truncation and the choice $S_{\max}=5K$ are explained in Parts 2 and 6). Both intervals are divided uniformly:
 
 $$
-\Delta S = \frac{S_{\max}}{M}, \qquad S_j = j\,\Delta S, \qquad j = 0,1,\dots,M, \tag{1.9}
+\Delta S = \frac{S_{\max}}{M}, \qquad S_j = j\,\Delta S, \qquad j = 0,1,\dots,M, \qquad\qquad (1.9)
 $$
 
 $$
-\Delta\tau = \frac{T}{N}, \qquad \tau_n = n\,\Delta\tau, \qquad n = 0,1,\dots,N. \tag{1.10}
+\Delta\tau = \frac{T}{N}, \qquad \tau_n = n\,\Delta\tau, \qquad n = 0,1,\dots,N. \qquad\qquad (1.10)
 $$
 
 The numerical solution is the array
@@ -143,7 +143,7 @@ At an interior node the stencils (1.5) and (1.6) with $h = \Delta S$ read
 
 $$
 \frac{\partial V}{\partial S}\Big|_j^n \approx \frac{V_{j+1}^n - V_{j-1}^n}{2\Delta S}, \qquad
-\frac{\partial^2 V}{\partial S^2}\Big|_j^n \approx \frac{V_{j+1}^n - 2V_j^n + V_{j-1}^n}{(\Delta S)^2}, \tag{1.11}
+\frac{\partial^2 V}{\partial S^2}\Big|_j^n \approx \frac{V_{j+1}^n - 2V_j^n + V_{j-1}^n}{(\Delta S)^2}, \qquad\qquad (1.11)
 $$
 
 both with error $O(\Delta S^2)$. Each uses only the three neighbours $V_{j-1}, V_j, V_{j+1}$ — the property that later makes every linear system **tridiagonal** (Part 3).
@@ -165,7 +165,7 @@ both with error $O(\Delta S^2)$. Each uses only the three neighbours $V_{j-1}, V
 The order of a formula is visible numerically: halving $h$ divides an $O(h^p)$ error by $2^p$, so the **observed order**
 
 $$
-p = \frac{\log(E_h / E_{h/2})}{\log 2} \tag{1.12}
+p = \frac{\log(E_h / E_{h/2})}{\log 2} \qquad\qquad (1.12)
 $$
 
 should approach 1 for one-sided and 2 for central formulas.

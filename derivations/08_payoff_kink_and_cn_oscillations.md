@@ -23,7 +23,7 @@ Three methods are compared on identical grids: **fully implicit**, **pure Crankâ
 At $\tau = 0$,
 
 $$
-V(S,0) = \max(S-K,0), \qquad \frac{\partial V}{\partial S}(S,0) = H(S-K), \qquad \frac{\partial^2 V}{\partial S^2}(S,0) = \delta(S-K), \tag{8.1}
+V(S,0) = \max(S-K,0), \qquad \frac{\partial V}{\partial S}(S,0) = H(S-K), \qquad \frac{\partial^2 V}{\partial S^2}(S,0) = \delta(S-K), \qquad\qquad (8.1)
 $$
 
 where $H$ is the Heaviside step and $\delta$ the Dirac delta. The initial Gamma is infinite at the strike. For $\tau > 0$ the exact solution is smooth again (Gamma is the bell curve (7.2), with peak value growing like $1/(K\sigma\sqrt{\tau})$ as $\tau\to0$), so the difficulty is concentrated in the first moments of the time integration.
@@ -31,7 +31,7 @@ where $H$ is the Heaviside step and $\delta$ the Dirac delta. The initial Gamma 
 On the grid, with the strike on node $j_K$, the discrete second difference of the payoff is
 
 $$
-D_+D_- V_j^0 = \frac{1}{\Delta S}\,\delta_{j,j_K}, \tag{8.2}
+D_+D_- V_j^0 = \frac{1}{\Delta S}\,\delta_{j,j_K}, \qquad\qquad (8.2)
 $$
 
 a single spike of height $1/\Delta S$. A spike contains **all** grid frequencies with comparable weight, including the highest one the grid can carry, the saw-tooth $(-1)^j$.
@@ -49,14 +49,14 @@ $$
 So the saw-tooth is (locally) an eigenmode with eigenvalue $\mu \approx -2\sigma^2 j_K^2$. With $z = \Delta\tau\,\mu$ define the **mode-damping parameter at the strike**
 
 $$
-\lambda_K = \frac{\sigma^2 K^2\,\Delta\tau}{(\Delta S)^2}, \qquad z \approx -2\lambda_K. \tag{8.3}
+\lambda_K = \frac{\sigma^2 K^2\,\Delta\tau}{(\Delta S)^2}, \qquad z \approx -2\lambda_K. \qquad\qquad (8.3)
 $$
 
 The amplification factors (4.9) and (5.9) for this mode become
 
 $$
 G_{\text{BE}} = \frac{1}{1 + 2\lambda_K} \xrightarrow{\lambda_K\to\infty} 0, \qquad
-G_{\text{CN}} = \frac{1 - \lambda_K}{1 + \lambda_K} \xrightarrow{\lambda_K\to\infty} -1. \tag{8.4}
+G_{\text{CN}} = \frac{1 - \lambda_K}{1 + \lambda_K} \xrightarrow{\lambda_K\to\infty} -1. \qquad\qquad (8.4)
 $$
 
 * For $\lambda_K < 1$, $0 < G_{\text{CN}} < 1$: the mode decays monotonically and CN behaves well.
@@ -65,7 +65,7 @@ $$
 This is the precise meaning of "A-stable but not L-stable" (Part 5): nothing grows, but stiff components are not damped. The surviving saw-tooth is tiny in the *price*, but by (7.6) it is divided by $\Delta S^2$ in Gamma. Since the spike (8.2) itself scales like $1/\Delta S$, the spurious Gamma behaves roughly like
 
 $$
-E_\Gamma^{\text{spurious}} \sim \frac{\lvert G_{\text{CN}}\rvert^N}{\Delta S}, \tag{8.5}
+E_\Gamma^{\text{spurious}} \sim \frac{\lvert G_{\text{CN}}\rvert^N}{\Delta S}, \qquad\qquad (8.5)
 $$
 
 which explains the two counter-intuitive facts measured below: **refining $\Delta S$ at fixed $\Delta\tau$ makes pure CN worse**, and the oscillation disappears only once $N$ is large enough that $\lambda_K$ is of order 1 or below. Equivalently, the CN right-hand matrix $B = I + \tfrac{\Delta\tau}{2}L_h$ has negative diagonal entries near the strike when $\lambda_K > 1$, so the discrete maximum principle is lost there.
@@ -80,11 +80,11 @@ The fully implicit method is L-stable: $G_{\text{BE}}$ kills the saw-tooth immed
 
 $$
 \Big(I - \tfrac{\Delta\tau}{2}L_h\Big)\mathbf{V}^{1/2} = \mathbf{V}^0 + \mathbf{g}^{1/2}, \qquad
-\Big(I - \tfrac{\Delta\tau}{2}L_h\Big)\mathbf{V}^{1} = \mathbf{V}^{1/2} + \mathbf{g}^{1}, \tag{8.6}
+\Big(I - \tfrac{\Delta\tau}{2}L_h\Big)\mathbf{V}^{1} = \mathbf{V}^{1/2} + \mathbf{g}^{1}, \qquad\qquad (8.6)
 $$
 
 $$
-A\,\mathbf{V}^{n+1} = B\,\mathbf{V}^n + \mathbf{g}^{n,n+1}, \qquad n = 1,\dots,N-1 \quad\text{(ordinary CN, Part 5)}, \tag{8.7}
+A\,\mathbf{V}^{n+1} = B\,\mathbf{V}^n + \mathbf{g}^{n,n+1}, \qquad n = 1,\dots,N-1 \quad\text{(ordinary CN, Part 5)}, \qquad\qquad (8.7)
 $$
 
 with boundary values evaluated at $\tau = \Delta\tau/2$ and $\Delta\tau$ in (8.6). The time grid is unchanged; only the integrator on the first interval differs.
@@ -92,7 +92,7 @@ with boundary values evaluated at $\tau = \Delta\tau/2$ and $\Delta\tau$ in (8.6
 **Damping.** Over the first interval the saw-tooth is multiplied by
 
 $$
-G_{\text{start}} = \left(\frac{1}{1 + \lambda_K}\right)^2 \xrightarrow{\lambda_K\to\infty} 0, \tag{8.8}
+G_{\text{start}} = \left(\frac{1}{1 + \lambda_K}\right)^2 \xrightarrow{\lambda_K\to\infty} 0, \qquad\qquad (8.8)
 $$
 
 instead of $G_{\text{CN}} \to -1$. For the benchmark case below ($\lambda_K = 41$): $G_{\text{CN}} = -0.952$ per step, while the start-up factor is $5.7\times10^{-4}$.

@@ -23,13 +23,13 @@ A prediction is not evidence. This part (i) states the theory that links the loc
 The computed value at a node differs from the Black–Scholes value for three distinct reasons:
 
 $$
-V_j^N - V(S_j,T) \;=\; \underbrace{e_{\Delta S}}_{\text{space}} \;+\; \underbrace{e_{\Delta\tau}}_{\text{time}} \;+\; \underbrace{e_{S_{\max}}}_{\text{domain truncation}} \;(+\ \text{round-off}). \tag{6.1}
+V_j^N - V(S_j,T) \;=\; \underbrace{e_{\Delta S}}_{\text{space}} \;+\; \underbrace{e_{\Delta\tau}}_{\text{time}} \;+\; \underbrace{e_{S_{\max}}}_{\text{domain truncation}} \;(+\ \text{round-off}). \qquad\qquad (6.1)
 $$
 
 For a smooth solution the theory of Parts 4–5 gives
 
 $$
-e \approx C_S\,\Delta S^{2} + C_\tau\,\Delta\tau^{q} + e_{S_{\max}}, \qquad q = 1 \text{ (implicit)},\ q = 2 \text{ (CN)}. \tag{6.2}
+e \approx C_S\,\Delta S^{2} + C_\tau\,\Delta\tau^{q} + e_{S_{\max}}, \qquad q = 1 \text{ (implicit)},\ q = 2 \text{ (CN)}. \qquad\qquad (6.2)
 $$
 
 A refinement experiment measures one term only if the other two are kept negligible. All experiments use the benchmark $K=100$, $T=1$, $r=0.05$, $\sigma=0.20$, the call option, and $S_{\max} = 5K$ (justified in §6.8). With $S_{\max}=5K$ the strike is a node for every $M$ used ($j_K = M/5$), so the kink is sampled identically on every grid.
@@ -44,7 +44,7 @@ A refinement experiment measures one term only if the other two are kept negligi
 
 $$
 \text{consistency} + \text{stability} \;\Longrightarrow\; \text{convergence}, \qquad
-\lVert V^N - V(\cdot,T)\rVert = O(\Delta\tau^{q}) + O(\Delta S^2). \tag{6.3}
+\lVert V^N - V(\cdot,T)\rVert = O(\Delta\tau^{q}) + O(\Delta S^2). \qquad\qquad (6.3)
 $$
 
 ---
@@ -55,7 +55,7 @@ With $e_j = V_j^N - V(S_j,T)$ on the interior nodes,
 
 $$
 \lVert e\rVert_\infty = \max_{1\le j\le M-1}\lvert e_j\rvert, \qquad
-\lVert e\rVert_2 = \Big(\Delta S\sum_{j=1}^{M-1} e_j^2\Big)^{1/2}. \tag{6.4}
+\lVert e\rVert_2 = \Big(\Delta S\sum_{j=1}^{M-1} e_j^2\Big)^{1/2}. \qquad\qquad (6.4)
 $$
 
 The factor $\Delta S$ makes $\lVert e\rVert_2$ a discrete approximation of the continuous $L_2$ norm, so values from different grids are comparable.
@@ -63,7 +63,7 @@ The factor $\Delta S$ makes $\lVert e\rVert_2$ a discrete approximation of the c
 **Observed order.** If $E_h \approx C h^p$, then $E_{h/2} \approx C h^p 2^{-p}$, hence $E_h/E_{h/2} = 2^p$ and
 
 $$
-p = \frac{\log\left(E_h/E_{h/2}\right)}{\log 2}. \tag{6.5}
+p = \frac{\log\left(E_h/E_{h/2}\right)}{\log 2}. \qquad\qquad (6.5)
 $$
 
 On a log–log plot $\log E_h = \log C + p\log h$, so $p$ is the slope of the error curve.
@@ -77,7 +77,7 @@ On a log–log plot $\log E_h = \log C + p\log h$, so $p$ is the slope of the er
 **Temporal refinement.** $N = 50, 100, 200, 400$ with $M = 400$ fixed. Here measuring against the analytical solution does **not** work for CN: the spatial error of the $M=400$ grid ($3.9\times10^{-3}$) is three orders of magnitude larger than the CN temporal error, so the total error would stay at the spatial floor and the "observed order" would be $\approx 0$. Since the spatial grid is the same for all $N$, the spatial error is the same too; it is removed by comparing with a reference solution computed **on the same spatial grid** with a very small step, $N_{\text{ref}} = 12800$:
 
 $$
-e_{\Delta\tau} = V^{N}_{M} - V^{N_{\text{ref}}}_{M}. \tag{6.6}
+e_{\Delta\tau} = V^{N}_{M} - V^{N_{\text{ref}}}_{M}. \qquad\qquad (6.6)
 $$
 
 Both solutions share $e_{\Delta S}$ and $e_{S_{\max}}$, which cancel; what remains is the temporal error of the semi-discrete system (2.12). The reference uses CN with implicit start-up, whose own temporal error at $N_{\text{ref}}$ is $\sim10^{-9}$. The error against the analytical solution is reported alongside, to show the spatial floor explicitly.
@@ -85,7 +85,7 @@ Both solutions share $e_{\Delta S}$ and $e_{S_{\max}}$, which cancel; what remai
 **Paired refinement.** $(M,N) = (50,50),\dots,(400,400)$, i.e. $\Delta S$ and $\Delta\tau$ halved together, error against the analytical solution. With $\Delta\tau = T\,\Delta S/S_{\max}$, (6.2) gives
 
 $$
-E \approx C_S\Delta S^2 + C_\tau' \Delta S^{q}, \tag{6.7}
+E \approx C_S\Delta S^2 + C_\tau' \Delta S^{q}, \qquad\qquad (6.7)
 $$
 
 so CN should show $p = 2$, while the implicit method moves from $p\approx2$ (coarse grids, spatial error dominant) towards $p = 1$ (fine grids, temporal error dominant). Paired refinement is therefore *not* a substitute for the independent studies: it can only show the slowest of the two orders.

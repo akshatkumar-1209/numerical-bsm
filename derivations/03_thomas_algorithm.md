@@ -10,7 +10,7 @@
 Every implicit time step of Parts 4, 5 and 8 requires the solution of a linear system
 
 $$
-A\,\mathbf{x} = \mathbf{d}, \qquad A \in \mathbb{R}^{m\times m},\ m = M-1, \tag{3.1}
+A\,\mathbf{x} = \mathbf{d}, \qquad A \in \mathbb{R}^{m\times m},\ m = M-1, \qquad\qquad (3.1)
 $$
 
 in which row $i$ of $A$ contains at most three non-zero entries. Gaussian elimination on a dense $m\times m$ matrix costs $O(m^3)$ operations and $O(m^2)$ storage. The question of this part is:
@@ -24,7 +24,7 @@ in which row $i$ of $A$ contains at most three non-zero entries. Gaussian elimin
 The discrete operator (2.8) couples node $j$ only to $j-1$ and $j+1$. For the θ-scheme (2.13) the unknowns at level $n+1$ satisfy, for $j=1,\dots,M-1$,
 
 $$
-\underbrace{-\theta\Delta\tau\,\alpha_j}_{a_j} V_{j-1}^{n+1} + \underbrace{\left(1 - \theta\Delta\tau\,\beta_j\right)}_{b_j} V_j^{n+1} + \underbrace{-\theta\Delta\tau\,\gamma_j}_{c_j} V_{j+1}^{n+1} = d_j, \tag{3.2}
+\underbrace{-\theta\Delta\tau\,\alpha_j}_{a_j} V_{j-1}^{n+1} + \underbrace{\left(1 - \theta\Delta\tau\,\beta_j\right)}_{b_j} V_j^{n+1} + \underbrace{-\theta\Delta\tau\,\gamma_j}_{c_j} V_{j+1}^{n+1} = d_j, \qquad\qquad (3.2)
 $$
 
 where $d_j$ contains only known quantities (the old level and boundary values). Row $j$ has non-zeros only in columns $j-1, j, j+1$; the boundary values $V_0^{n+1}$ and $V_M^{n+1}$ are known and move to $d_1$ and $d_{M-1}$. Hence
@@ -36,7 +36,7 @@ a_2 & b_2 & c_2 & & \\
  & \ddots & \ddots & \ddots & \\
  & & a_{m-1} & b_{m-1} & c_{m-1} \\
  & & & a_m & b_m
-\end{pmatrix}, \qquad m = M-1. \tag{3.3}
+\end{pmatrix}, \qquad m = M-1. \qquad\qquad (3.3)
 $$
 
 ---
@@ -46,13 +46,13 @@ $$
 Write the system row by row (index $i = 1,\dots,m$, with $a_1 = c_m = 0$):
 
 $$
-a_i x_{i-1} + b_i x_i + c_i x_{i+1} = d_i. \tag{3.4}
+a_i x_{i-1} + b_i x_i + c_i x_{i+1} = d_i. \qquad\qquad (3.4)
 $$
 
 **Forward elimination.** The aim is to turn (3.4) into the upper-bidiagonal form
 
 $$
-x_i + \tilde c_i\, x_{i+1} = \tilde d_i. \tag{3.5}
+x_i + \tilde c_i\, x_{i+1} = \tilde d_i. \qquad\qquad (3.5)
 $$
 
 *Row 1.* Divide by $b_1$: $\ \tilde c_1 = c_1/b_1$, $\ \tilde d_1 = d_1/b_1$.
@@ -68,13 +68,13 @@ $$
 Dividing by the pivot $q_i$ gives (3.5) with
 
 $$
-q_i = b_i - a_i\,\tilde c_{i-1}, \qquad \tilde c_i = \frac{c_i}{q_i}, \qquad \tilde d_i = \frac{d_i - a_i\,\tilde d_{i-1}}{q_i}, \qquad i = 2,\dots,m. \tag{3.6}
+q_i = b_i - a_i\,\tilde c_{i-1}, \qquad \tilde c_i = \frac{c_i}{q_i}, \qquad \tilde d_i = \frac{d_i - a_i\,\tilde d_{i-1}}{q_i}, \qquad i = 2,\dots,m. \qquad\qquad (3.6)
 $$
 
 **Back substitution.** The last row has no $x_{m+1}$ ($c_m=0$), so $x_m = \tilde d_m$; then (3.5) is solved upwards:
 
 $$
-x_m = \tilde d_m, \qquad x_i = \tilde d_i - \tilde c_i\,x_{i+1}, \qquad i = m-1,\dots,1. \tag{3.7}
+x_m = \tilde d_m, \qquad x_i = \tilde d_i - \tilde c_i\,x_{i+1}, \qquad i = m-1,\dots,1. \qquad\qquad (3.7)
 $$
 
 **Cost.** (3.6) needs about 6 operations per row and (3.7) about 2, i.e. roughly $8m$ operations and $O(m)$ storage, compared with $\tfrac23 m^3$ for dense elimination. For $M = 400$ this is ~3,200 operations instead of ~$4\times10^7$ per time step.
@@ -86,7 +86,7 @@ $$
 The Thomas algorithm is Gaussian elimination **without pivoting**; it fails if a pivot $q_i$ vanishes and amplifies round-off if $\lvert\tilde c_i\rvert$ grows. A sufficient condition for safety is **strict diagonal dominance**:
 
 $$
-\lvert b_i\rvert > \lvert a_i\rvert + \lvert c_i\rvert, \qquad i = 1,\dots,m. \tag{3.8}
+\lvert b_i\rvert > \lvert a_i\rvert + \lvert c_i\rvert, \qquad i = 1,\dots,m. \qquad\qquad (3.8)
 $$
 
 *Claim:* under (3.8), $\lvert\tilde c_i\rvert < 1$ and $q_i \neq 0$ for all $i$.

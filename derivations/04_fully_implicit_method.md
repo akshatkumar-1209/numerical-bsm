@@ -17,7 +17,7 @@ $dV_j/d\tau = \mathcal{L}_h V_j$, with known boundary values and payoff. We now 
 Grid and symbols as in Parts 1–2: $V_j^n \approx V(S_j,\tau_n)$, $S_j = j\Delta S$, $\tau_n = n\Delta\tau$, interior $j = 1,\dots,M-1$, and the operator coefficients
 
 $$
-\alpha_j = \tfrac12(\sigma^2 j^2 - rj), \qquad \beta_j = -(\sigma^2 j^2 + r), \qquad \gamma_j = \tfrac12(\sigma^2 j^2 + rj). \tag{2.9}
+\alpha_j = \tfrac12(\sigma^2 j^2 - rj), \qquad \beta_j = -(\sigma^2 j^2 + r), \qquad \gamma_j = \tfrac12(\sigma^2 j^2 + rj). \qquad\qquad (2.9)
 $$
 
 Boundary data $g_0^n = V(0,\tau_n)$ and $g_M^n = V(S_{\max},\tau_n)$ from (2.4)–(2.5); initial data $V_j^0 = \text{payoff}(S_j)$.
@@ -30,27 +30,29 @@ $r$, $\sigma$ are constant, so the coefficients do not change with $n$.
 Set $\theta = 1$ in the θ-scheme (2.13), i.e. approximate $V_\tau$ at $\tau_{n+1}$ by the backward difference (1.7) and evaluate $\mathcal{L}_h$ at $\tau_{n+1}$:
 
 $$
-\frac{V_j^{n+1} - V_j^n}{\Delta\tau} = \alpha_j V_{j-1}^{n+1} + \beta_j V_j^{n+1} + \gamma_j V_{j+1}^{n+1}. \tag{4.1}
+\frac{V_j^{n+1} - V_j^n}{\Delta\tau} = \alpha_j V_{j-1}^{n+1} + \beta_j V_j^{n+1} + \gamma_j V_{j+1}^{n+1}. \qquad\qquad (4.1)
 $$
 
 Multiply by $\Delta\tau$ and collect all unknowns (level $n+1$) on the left:
 
 $$
--\Delta\tau\,\alpha_j\,V_{j-1}^{n+1} + \left(1 - \Delta\tau\,\beta_j\right)V_j^{n+1} - \Delta\tau\,\gamma_j\,V_{j+1}^{n+1} = V_j^n. \tag{4.2}
+-\Delta\tau\,\alpha_j\,V_{j-1}^{n+1} + \left(1 - \Delta\tau\,\beta_j\right)V_j^{n+1} - \Delta\tau\,\gamma_j\,V_{j+1}^{n+1} = V_j^n. \qquad\qquad (4.2)
 $$
 
 Define
 
 $$
-a_j = -\Delta\tau\,\alpha_j = -\frac{\Delta\tau}{2}\left(\sigma^2 j^2 - rj\right), \quad
-b_j = 1 - \Delta\tau\,\beta_j = 1 + \Delta\tau\left(\sigma^2 j^2 + r\right), \quad
-c_j = -\Delta\tau\,\gamma_j = -\frac{\Delta\tau}{2}\left(\sigma^2 j^2 + rj\right), \tag{4.3}
+\begin{aligned}
+a_j &= -\Delta\tau\,\alpha_j = -\frac{\Delta\tau}{2}\left(\sigma^2 j^2 - rj\right), \\
+b_j &= 1 - \Delta\tau\,\beta_j = 1 + \Delta\tau\left(\sigma^2 j^2 + r\right), \\
+c_j &= -\Delta\tau\,\gamma_j = -\frac{\Delta\tau}{2}\left(\sigma^2 j^2 + rj\right),
+\end{aligned} \qquad\qquad (4.3)
 $$
 
 so that every interior equation reads
 
 $$
-a_j V_{j-1}^{n+1} + b_j V_j^{n+1} + c_j V_{j+1}^{n+1} = V_j^n, \qquad j = 1,\dots,M-1. \tag{4.4}
+a_j V_{j-1}^{n+1} + b_j V_j^{n+1} + c_j V_{j+1}^{n+1} = V_j^n, \qquad j = 1,\dots,M-1. \qquad\qquad (4.4)
 $$
 
 ---
@@ -60,11 +62,11 @@ $$
 For $j = 1$ the equation contains $V_0^{n+1} = g_0^{n+1}$, and for $j = M-1$ it contains $V_M^{n+1} = g_M^{n+1}$. Both are known, so they are moved to the right-hand side:
 
 $$
-b_1 V_1^{n+1} + c_1 V_2^{n+1} = V_1^n - a_1\,g_0^{n+1}, \tag{4.5}
+b_1 V_1^{n+1} + c_1 V_2^{n+1} = V_1^n - a_1\,g_0^{n+1}, \qquad\qquad (4.5)
 $$
 
 $$
-a_{M-1} V_{M-2}^{n+1} + b_{M-1} V_{M-1}^{n+1} = V_{M-1}^n - c_{M-1}\,g_M^{n+1}. \tag{4.6}
+a_{M-1} V_{M-2}^{n+1} + b_{M-1} V_{M-1}^{n+1} = V_{M-1}^n - c_{M-1}\,g_M^{n+1}. \qquad\qquad (4.6)
 $$
 
 Note the boundary values are taken at the **new** level $\tau_{n+1}$, consistently with (4.1). (For the call $g_0 = 0$, so only (4.6) is active; for the put only (4.5).)
@@ -83,7 +85,7 @@ a_2 & b_2 & c_2 & \\
  & \ddots & \ddots & \ddots \\
  & & a_{M-1} & b_{M-1}
 \end{pmatrix}, \qquad
-\mathbf{g}^{n+1} = \begin{pmatrix} -a_1 g_0^{n+1} \\ 0 \\ \vdots \\ 0 \\ -c_{M-1} g_M^{n+1} \end{pmatrix}. \tag{4.7}
+\mathbf{g}^{n+1} = \begin{pmatrix} -a_1 g_0^{n+1} \\ 0 \\ \vdots \\ 0 \\ -c_{M-1} g_M^{n+1} \end{pmatrix}. \qquad\qquad (4.7)
 $$
 
 Equivalently $A = I - \Delta\tau\,L_h$, where $L_h$ is the tridiagonal matrix with rows $(\alpha_j, \beta_j, \gamma_j)$. Because the parameters are constant, $A$ is the same at every step; only the right-hand side changes.
@@ -118,7 +120,7 @@ $$
 Hence the scheme is **consistent** with local truncation error
 
 $$
-\mathcal{T}_{\text{Imp}} = O(\Delta\tau) + O(\Delta S^2), \tag{4.8}
+\mathcal{T}_{\text{Imp}} = O(\Delta\tau) + O(\Delta S^2), \qquad\qquad (4.8)
 $$
 
 first order in time and second order in space, provided $V$ is smooth (Part 8 discusses the strike at $\tau \to 0$).
@@ -130,7 +132,7 @@ first order in time and second order in space, provided $V$ is smooth (Part 8 di
 **Amplification of a mode.** $L_h$ has real negative eigenvalues $\mu_k$ (for $j \ge 2$, $\alpha_j\gamma_j > 0$ makes $L_h$ similar to a symmetric matrix; Gershgorin's theorem with (2.10) places every eigenvalue in $[\,-2\sigma^2 j^2 - r,\ -r\,]$ for the rows with $\alpha_j \ge 0$, and in $[-\sigma^2 - 2r, -\sigma^2]$ for row 1). Expanding the error in eigenvectors, each component is multiplied per step by
 
 $$
-G_{\text{BE}}(z) = \frac{1}{1 - z}, \qquad z = \Delta\tau\,\mu_k \le 0 \quad\Longrightarrow\quad 0 < G_{\text{BE}} < 1. \tag{4.9}
+G_{\text{BE}}(z) = \frac{1}{1 - z}, \qquad z = \Delta\tau\,\mu_k \le 0 \quad\Longrightarrow\quad 0 < G_{\text{BE}} < 1. \qquad\qquad (4.9)
 $$
 
 The scheme is therefore **unconditionally stable** — no restriction such as $\Delta\tau \le C\Delta S^2$ is needed. Moreover $G_{\text{BE}}(z) \to 0$ as $z \to -\infty$ (**L-stability**): the stiffest, most oscillatory modes are damped most strongly. This property is what makes the method robust at the payoff kink (Part 8).
@@ -140,7 +142,7 @@ The scheme is therefore **unconditionally stable** — no restriction such as $\
 **Convergence.** Consistency (4.8) plus stability give convergence (Lax equivalence, Duffy Ch. 14):
 
 $$
-\max_j \lvert V_j^N - V(S_j,T)\rvert = O(\Delta\tau) + O(\Delta S^2). \tag{4.10}
+\max_j \lvert V_j^N - V(S_j,T)\rvert = O(\Delta\tau) + O(\Delta S^2). \qquad\qquad (4.10)
 $$
 
 Stability does **not** mean accuracy: a large $\Delta\tau$ gives a stable but first-order-inaccurate answer.
