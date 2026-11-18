@@ -161,9 +161,6 @@ Common options: `--K --T --r --sigma --S0 --Smax --M --N --no-plot`.
 ## References
 
 1. D. J. Duffy, *Numerical Methods in Computational Finance: A Partial Differential Equation (PDE/FDM) Approach*, Wiley, 2022 — Ch. 7 (Black–Scholes FDM), Ch. 14–15 (consistency, stability, convergence, CN oscillations), Ch. 16 (Greeks).
-2. F. Black and M. Scholes, The pricing of options and corporate liabilities, *Journal of Political Economy* 81 (1973) 637–654.
-3. R. Rannacher, Finite element solution of diffusion problems with irregular data, *Numerische Mathematik* 43 (1984) 309–327.
-4. M. B. Giles and R. Carter, Convergence analysis of Crank–Nicolson and Rannacher time-marching, *Journal of Computational Finance* 9(4) (2006) 89–112.
-5. D. Tavella and C. Randall, *Pricing Financial Instruments: The Finite Difference Method*, Wiley, 2000.
+2. Numerical Partial Differential Equations in Finance Explained: An Introduction to Computational Finance -Book by Karel in 't Hout
 
 **Author:** Akshat Kumar — BITS Pilani, Hyderabad Campus.
