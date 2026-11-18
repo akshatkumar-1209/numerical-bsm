@@ -163,4 +163,3 @@ Common options: `--K --T --r --sigma --S0 --Smax --M --N --no-plot`.
 1. D. J. Duffy, *Numerical Methods in Computational Finance: A Partial Differential Equation (PDE/FDM) Approach*, Wiley, 2022 — Ch. 7 (Black–Scholes FDM), Ch. 14–15 (consistency, stability, convergence, CN oscillations), Ch. 16 (Greeks).
 2. Numerical Partial Differential Equations in Finance Explained: An Introduction to Computational Finance -Book by Karel in 't Hout
 
-**Author:** Akshat Kumar — BITS Pilani, Hyderabad Campus.
